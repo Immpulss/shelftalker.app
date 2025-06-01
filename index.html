@@ -299,6 +299,16 @@
           height: 180px;
         }
       }
+
+      #scannerOverlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: black;
+        z-index: 9999;
+      }
     </style>
   </head>
   <body>
@@ -312,7 +322,7 @@
     </div>
 
     <div class="scan-wrapper">
-      <button onclick="toggleScanner()">📷 Scan Barcode</button>
+      <button onclick="openScanner()">📷 Scan Barcode</button>
     </div>
 
     <form class="form" id="cardForm" onsubmit="addCard(event)">
@@ -349,45 +359,48 @@
       const cardQueue = [];
       let scanner;
 
-      function toggleScanner() {
-        const container = document.getElementById("barcode-scanner");
-        if (container.style.display === "none") {
-          container.style.display = "block";
-          startScanner();
-        } else {
-          container.style.display = "none";
-          stopScanner();
-        }
-      }
+      function openScanner() {
+        document.getElementById("scannerOverlay").style.display = "block";
+        const html5QrCode = new Html5Qrcode("reader");
 
-      function startScanner() {
-        if (!scanner) {
-          scanner = new Html5Qrcode("barcode-scanner");
-        }
-        scanner.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: 250 },
-          (decodedText) => {
-            if (/^\d{10,13}$/.test(decodedText)) {
+        html5QrCode
+          .start(
+            { facingMode: "environment" },
+            {
+              fps: 10,
+              qrbox: 250,
+            },
+            (decodedText) => {
               document.getElementById("isbn").value = decodedText;
-              handleISBN();
-              toggleScanner();
+              html5QrCode.stop().then(() => {
+                document.getElementById("scannerOverlay").style.display =
+                  "none";
+                handleISBN(); // trigger lookup
+              });
+            },
+            (errorMessage) => {
+              // silently ignore scanning errors
             }
-          },
-          (error) => {
-            console.warn(error);
-          }
-        );
+          )
+          .catch((err) => {
+            alert("Camera error");
+            document.getElementById("scannerOverlay").style.display = "none";
+          });
+
+        // Save instance so we can stop it later
+        window.currentScanner = html5QrCode;
       }
 
-      function stopScanner() {
-        if (scanner) {
-          scanner
+      function closeScanner() {
+        if (window.currentScanner) {
+          window.currentScanner
             .stop()
             .then(() => {
-              document.getElementById("barcode-scanner").style.display = "none";
+              document.getElementById("scannerOverlay").style.display = "none";
             })
-            .catch(console.error);
+            .catch(() => {
+              document.getElementById("scannerOverlay").style.display = "none";
+            });
         }
       }
 
@@ -397,6 +410,7 @@
 
       async function handleISBN() {
         const isbn = document.getElementById("isbn").value.trim();
+
         if (!isbn) return;
         const res = await fetch(
           `https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`
@@ -534,6 +548,22 @@
       "
     >
       <div class="spinner"></div>
+    </div>
+
+    <div id="scannerOverlay" style="display: none">
+      <button
+        onclick="closeScanner()"
+        style="
+          position: absolute;
+          top: 10px;
+          right: 10px;
+          z-index: 1000;
+          font-size: 24px;
+        "
+      >
+        ❌ Close
+      </button>
+      <div id="reader" style="width: 100vw; height: 100vh"></div>
     </div>
   </body>
 </html>
