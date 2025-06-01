@@ -317,9 +317,11 @@
 
     <form class="form" id="cardForm" onsubmit="addCard(event)">
       <input
-        type="text"
+        type="tel"
         id="isbn"
         placeholder="ISBN Number"
+        inputmode="numeric"
+        pattern="[0-9]"
         onblur="handleISBN()"
         onkeydown="if(event.key==='Enter'){ event.preventDefault(); handleISBN(); }"
       />
