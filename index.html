@@ -36,6 +36,18 @@
         flex-direction: column;
         align-items: center;
       }
+
+      @media print {
+        footer,
+        .footer,
+        .page-footer,
+        .site-footer,
+        #github-corner,
+        body::after {
+          display: none !important;
+        }
+      }
+
       .sheet {
         display: flex;
         flex-direction: column;
@@ -311,8 +323,6 @@
         overscroll-behavior: contain;
         touch-action: none;
       }
-
-      
     </style>
   </head>
   <body>
@@ -576,10 +586,12 @@
         ❌ Close
       </button>
       <div id="reader" style="width: 100%; height: 100%"></div>
-  
     </div>
 
-    <audio id="beep" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg" preload="auto"></audio>
-
+    <audio
+      id="beep"
+      src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg"
+      preload="auto"
+    ></audio>
   </body>
 </html>
