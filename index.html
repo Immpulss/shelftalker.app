@@ -538,32 +538,31 @@
       }
 
       function renderCards() {
-  const container = document.getElementById("container");
-  container.innerHTML = "";
-  for (let i = 0; i < cardQueue.length; i += 5) {
-    const sheet = document.createElement("div");
-    sheet.className = "sheet";
-    for (let j = i; j < i + 5 && j < cardQueue.length; j++) {
-      const card = document.createElement("div");
-      card.className = "card";
-      card.innerHTML = `
-        <div>
-          <div class="title">${cardQueue[j].title}</div>
-          <div class="author">${cardQueue[j].author}</div>
-          <div class="summary">${cardQueue[j].summary}</div>
-        </div>
-        <div class="footer-container">
-          <div class="footer-line-alt"></div>
-          <div class="footer-text">B&amp;N Ocala</div>
-        </div>
-        <button class="delete-button" onclick="deleteCard(${j})">✖</button>
-        <button class="delete-button" style="top: 34px;" onclick="editCard(${j})">✏️</button>
-      `;
-      sheet.appendChild(card);
-    }
-    container.appendChild(sheet);
-  }
-}
+        const container = document.getElementById("container");
+        container.innerHTML = "";
+        for (let i = 0; i < cardQueue.length; i += 5) {
+          const sheet = document.createElement("div");
+          sheet.className = "sheet";
+          for (let j = i; j < i + 5 && j < cardQueue.length; j++) {
+            const card = document.createElement("div");
+            card.className = "card";
+            card.innerHTML = `
+                  <div>
+                    <div class="title">${cardQueue[j].title}</div>
+                    <div class="author">${cardQueue[j].author}</div>
+                    <div class="summary">${cardQueue[j].summary}</div>
+                  </div>
+                  <div class="footer-container">
+                    <div class="footer-line-alt"></div>
+                    <div class="footer-text">B&amp;N Ocala</div>
+                  </div>
+                  <button class="delete-button" onclick="deleteCard(${j})">✖</button>
+                `;
+            sheet.appendChild(card);
+          }
+          container.appendChild(sheet);
+        }
+      }
 
       function printCards() {
         window.print();
@@ -598,18 +597,6 @@
           renderCards();
         }
       }
-      
-function editCard(index) {
-  const card = cardQueue[index];
-  document.getElementById("title").value = card.title;
-  document.getElementById("author").value = card.author;
-  document.getElementById("summary").value = card.summary;
-  document.getElementById("isbn").value = "";
-  cardQueue.splice(index, 1);
-  renderCards();
-}
-
-
       function deleteCard(index) {
         cardQueue.splice(index, 1);
         renderCards();
