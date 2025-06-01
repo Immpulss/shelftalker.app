@@ -512,58 +512,27 @@
       }
 
       function printCards() {
-        const cards = document.getElementById("printQueue").innerHTML;
+  alert("Button clicked!"); // Check that the button is wired
 
-        // Try to open a new window
-        const printWindow = window.open("", "_blank");
+  try {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert("Pop-up blocked!");
+      return;
+    }
 
-        if (!printWindow) {
-          alert("Popup was blocked. Please allow popups for this site.");
-          return;
-        }
+    printWindow.document.write('<html><head><title>Test Print</title></head><body>');
+    printWindow.document.write('<h1>This is a test card</h1>');
+    printWindow.document.write('</body></html>');
+    printWindow.document.close();
+    printWindow.focus();
 
-        // Write HTML to the new window
-        printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Print Cards</title>
-          <style>
-            @page {
-              size: A4 portrait;
-              margin: 0;
-            }
-
-            body {
-              margin: 0;
-              padding: 0;
-              font-family: sans-serif;
-            }
-
-            .card {
-              width: 15cm;
-              height: 5.5cm;
-              border: 1px solid #aaa;
-              padding: 16px 2.5cm 16px 1.8cm;
-              box-sizing: border-box;
-              display: flex;
-              flex-direction: column;
-              justify-content: space-between;
-              position: relative;
-              margin: 0;
-              page-break-inside: avoid;
-              break-inside: avoid;
-            }
-          </style>
-        </head>
-        <body onload="window.print(); window.close();">
-          ${cards}
-        </body>
-      </html>
-    `);
-
-        printWindow.document.close(); // Finish writing and render content
-      }
+    printWindow.print();
+  } catch (e) {
+    alert("Error occurred: " + e.message);
+    console.error(e);
+  }
+}
 
       function clearCards() {
         cardQueue.length = 0;
