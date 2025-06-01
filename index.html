@@ -335,6 +335,21 @@
         display: none !important;
       }
 
+    
+    #card-wrapper {
+      width: 100%;
+      overflow-x: auto;
+      display: flex;
+      justify-content: center;
+    }
+
+    @media (max-width: 600px) {
+      .sheet {
+        transform: scale(0.85);
+        transform-origin: top center;
+      }
+    }
+
     </style>
   </head>
   <body>
@@ -345,6 +360,10 @@
       
       <button id="downloadPDF" class="top-btn print-btn">
         📄 Download PDF
+      </button>
+
+      <button onclick="printCards()" class="top-btn print-btn">
+        🖨️ Print Cards
       </button>
     </div>
 
@@ -380,7 +399,9 @@
     </form>
 
     <div id="barcode-scanner"></div>
-    <div id="container"></div>
+    <div id="card-wrapper">
+  <div id="container">  </div>
+</div>
 
     <script>
       const cardQueue = [];
