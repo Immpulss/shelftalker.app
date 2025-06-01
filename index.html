@@ -20,7 +20,24 @@
         .form,
         .controls,
         .delete-button,
-        #barcode-scanner,
+        #barcode-scanner {
+          display: none !important;
+        }
+        body {
+          margin: 0;
+          padding: 0;
+        }
+      }
+      body {
+        font-family: Georgia, serif;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      @media print {
         footer,
         .footer,
         .page-footer,
@@ -28,22 +45,6 @@
         #github-corner,
         body::after {
           display: none !important;
-        }
-
-        @page {
-          margin: 0;
-          size: auto;
-        }
-
-        body {
-          margin: 0;
-          padding: 0;
-        }
-
-        html,
-        body {
-          -webkit-print-color-adjust: exact;
-          print-color-adjust: exact;
         }
       }
 
@@ -511,57 +512,20 @@
       }
 
       function printCards() {
-        const queue = JSON.parse(localStorage.getItem("printQueue") || "[]");
-        if (queue.length === 0) {
-          alert("No cards in the print queue.");
-          return;
-        }
+        window.print();
+      }
 
-        const printWindow = window.open("", "_blank");
-        if (!printWindow) {
-          alert("Popup blocker prevented print window from opening.");
-          return;
-        }
+      function clearCards() {
+        cardQueue.length = 0;
+        renderCards();
+      }
 
-        let html = `
-    <html>
-      <head>
-        <title>Printable Shelf Talker Cards</title>
-        <style>
-          @media print {
-            @page { margin: 0; size: auto; }
-            body { margin: 0; padding: 0; }
-          }
-          .card {
-            width: 6in;
-            height: 3in;
-            border: 1px solid #aaa;
-            margin: 0.5in auto;
-            padding: 1em;
-            box-sizing: border-box;
-            font-family: sans-serif;
-          }
-        </style>
-      </head>
-      <body onload="window.print()">
-  `;
-
-        for (const card of queue) {
-          html += `
-      <div class="card">
-        <h2>${card.title}</h2>
-        <strong>${card.author}</strong>
-        <p>${card.summary}</p>
-        <hr>
-        <div style="text-align: right">B&N Ocala</div>
-      </div>
-    `;
-        }
-
-        html += `</body></html>`;
-
-        printWindow.document.write(html);
-        printWindow.document.close();
+      function addCardFromButton() {
+        document
+          .getElementById("cardForm")
+          .dispatchEvent(
+            new Event("submit", { cancelable: true, bubbles: true })
+          );
       }
 
       function addCard(event) {
