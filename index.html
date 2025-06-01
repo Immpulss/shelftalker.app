@@ -20,24 +20,7 @@
         .form,
         .controls,
         .delete-button,
-        #barcode-scanner {
-          display: none !important;
-        }
-        body {
-          margin: 0;
-          padding: 0;
-        }
-      }
-      body {
-        font-family: Georgia, serif;
-        margin: 0;
-        padding: 0;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-      }
-
-      @media print {
+        #barcode-scanner,
         footer,
         .footer,
         .page-footer,
@@ -45,6 +28,22 @@
         #github-corner,
         body::after {
           display: none !important;
+        }
+
+        @page {
+          margin: 0;
+          size: auto;
+        }
+
+        body {
+          margin: 0;
+          padding: 0;
+        }
+
+        html,
+        body {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
         }
       }
 
@@ -511,19 +510,18 @@
         }
       }
 
-     function printCards() {
-  const printWindow = window.open('', '_blank');
-  if (!printWindow) {
-    alert("Pop-up blocked or failed to open window.");
-    return;
-  }
+      function printCards() {
+        const printWindow = window.open("", "_blank");
+        if (!printWindow) {
+          alert("Pop-up blocked or failed to open window.");
+          return;
+        }
 
-  printWindow.document.write('<h1>Hello, test print window!</h1>');
-  printWindow.document.close();
-  printWindow.focus();
-  printWindow.print();
-}
-
+        printWindow.document.write("<h1>Hello, test print window!</h1>");
+        printWindow.document.close();
+        printWindow.focus();
+        printWindow.print();
+      }
 
       function clearCards() {
         cardQueue.length = 0;
