@@ -335,44 +335,6 @@
         display: none !important;
       }
 
-    
-    #card-wrapper {
-      width: 100%;
-      overflow-x: auto;
-      display: flex;
-      justify-content: center;
-    }
-
-    @media (max-width: 600px) {
-      .sheet {
-        transform: scale(0.85);
-        transform-origin: top center;
-      }
-    }
-
-    
-@media (max-width: 600px) {
-  #card-wrapper {
-    overflow-x: hidden;
-    position: relative;
-  }
-
-  #container {
-    display: flex;
-    flex-direction: row;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .sheet {
-    flex: 0 0 100%;
-    scroll-snap-align: start;
-    display: flex;
-    justify-content: center;
-  }
-}
-
     </style>
   </head>
   <body>
@@ -418,9 +380,7 @@
     </form>
 
     <div id="barcode-scanner"></div>
-    <div id="card-wrapper">
-  <div id="container">  </div>
-</div>
+    <div id="container"></div>
 
     <script>
       const cardQueue = [];
