@@ -8,6 +8,13 @@
       content="no-cache, no-store, must-revalidate"
     />
 
+    <!-- iOS Home Screen Icon -->
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+
+    <!-- Make app open fullscreen on iOS (optional) -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
       @page {
@@ -323,18 +330,16 @@
         overscroll-behavior: contain;
         touch-action: none;
       }
-    
+
       @media print {
         .card .delete-button {
           display: none !important;
         }
       }
 
-    
       .hide-in-pdf {
         display: none !important;
       }
-
     </style>
   </head>
   <body>
@@ -342,7 +347,7 @@
       <button onclick="clearCards()" class="top-btn clear-btn">
         🗑️ Clear Queue
       </button>
-      
+
       <button id="downloadPDF" class="top-btn print-btn">
         📄 Download PDF
       </button>
@@ -609,32 +614,35 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
-  
+    <script>
+      document
+        .getElementById("downloadPDF")
+        .addEventListener("click", function () {
+          const element = document.getElementById("container");
 
+          // Temporarily hide delete buttons
+          const deleteButtons = element.querySelectorAll(".delete-button");
+          deleteButtons.forEach((btn) => btn.classList.add("hide-in-pdf"));
 
+          const opt = {
+            margin: 0,
+            filename: "shelftalkers.pdf",
+            image: { type: "jpeg", quality: 0.98 },
+            html2canvas: { scale: 2 },
+            jsPDF: { unit: "in", format: "letter", orientation: "portrait" },
+          };
 
-<script>
-  document.getElementById("downloadPDF").addEventListener("click", function () {
-    const element = document.getElementById("container");
-
-    // Temporarily hide delete buttons
-    const deleteButtons = element.querySelectorAll(".delete-button");
-    deleteButtons.forEach(btn => btn.classList.add("hide-in-pdf"));
-
-    const opt = {
-      margin:       0,
-      filename:     'shelftalkers.pdf',
-      image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2 },
-      jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-    };
-
-    html2pdf().set(opt).from(element).save().then(() => {
-      // Restore delete buttons
-      deleteButtons.forEach(btn => btn.classList.remove("hide-in-pdf"));
-    });
-  });
-</script>
-
-</body>
+          html2pdf()
+            .set(opt)
+            .from(element)
+            .save()
+            .then(() => {
+              // Restore delete buttons
+              deleteButtons.forEach((btn) =>
+                btn.classList.remove("hide-in-pdf")
+              );
+            });
+        });
+    </script>
+  </body>
 </html>
