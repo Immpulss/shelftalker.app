@@ -511,28 +511,19 @@
         }
       }
 
-      function printCards() {
-  alert("Button clicked!"); // Check that the button is wired
-
-  try {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert("Pop-up blocked!");
-      return;
-    }
-
-    printWindow.document.write('<html><head><title>Test Print</title></head><body>');
-    printWindow.document.write('<h1>This is a test card</h1>');
-    printWindow.document.write('</body></html>');
-    printWindow.document.close();
-    printWindow.focus();
-
-    printWindow.print();
-  } catch (e) {
-    alert("Error occurred: " + e.message);
-    console.error(e);
+     function printCards() {
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    alert("Pop-up blocked or failed to open window.");
+    return;
   }
+
+  printWindow.document.write('<h1>Hello, test print window!</h1>');
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
 }
+
 
       function clearCards() {
         cardQueue.length = 0;
