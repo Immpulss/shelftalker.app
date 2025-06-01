@@ -512,7 +512,43 @@
       }
 
       function printCards() {
-        window.print();
+        const cards = document.getElementById("printQueue").innerHTML;
+        const printWindow = window.open("", "", "width=800,height=600");
+        printWindow.document.write(`
+    <html>
+      <head>
+        <title>Printable Shelf Talker Cards</title>
+        <style>
+          @media print {
+            body {
+              margin: 0;
+              padding: 0;
+            }
+
+            .card {
+              page-break-inside: avoid;
+              break-inside: avoid;
+            }
+
+            @page {
+              margin: 0;
+            }
+          }
+
+          .card {
+            /* Your fixed size here (in inches or pixels) */
+            width: 4in;
+            height: 6in;
+            margin: 0.25in auto;
+          }
+        </style>
+      </head>
+      <body onload="window.print(); window.close();">
+        ${cards}
+      </body>
+    </html>
+  `);
+        printWindow.document.close();
       }
 
       function clearCards() {
