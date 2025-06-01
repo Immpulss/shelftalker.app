@@ -323,6 +323,10 @@
         overscroll-behavior: contain;
         touch-action: none;
       }
+
+      .card .delete-button {
+        display: none;
+      }
     </style>
   </head>
   <body>
@@ -332,6 +336,9 @@
       </button>
       <button onclick="printCards()" class="top-btn print-btn">
         🖨️ Print Cards
+      </button>
+      <button id="downloadPDF" class="top-btn print-btn">
+        📄 Download PDF
       </button>
     </div>
 
@@ -593,5 +600,23 @@
       src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg"
       preload="auto"
     ></audio>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <script>
+      document
+        .getElementById("downloadPDF")
+        .addEventListener("click", function () {
+          const element = document.getElementById("container"); // This holds all the cards
+          const opt = {
+            margin: 0,
+            filename: "shelftalkers.pdf",
+            image: { type: "jpeg", quality: 0.98 },
+            html2canvas: { scale: 2 },
+            jsPDF: { unit: "in", format: "letter", orientation: "portrait" },
+          };
+          html2pdf().set(opt).from(element).save();
+        });
+    </script>
   </body>
 </html>
