@@ -511,29 +511,57 @@
       }
 
       function printCards() {
-        const printWindow = window.open("", "_blank");
-        if (!printWindow) {
-          alert("Pop-up blocked or failed to open window.");
+        const queue = JSON.parse(localStorage.getItem("printQueue") || "[]");
+        if (queue.length === 0) {
+          alert("No cards in the print queue.");
           return;
         }
 
-        printWindow.document.write("<h1>Hello, test print window!</h1>");
+        const printWindow = window.open("", "_blank");
+        if (!printWindow) {
+          alert("Popup blocker prevented print window from opening.");
+          return;
+        }
+
+        let html = `
+    <html>
+      <head>
+        <title>Printable Shelf Talker Cards</title>
+        <style>
+          @media print {
+            @page { margin: 0; size: auto; }
+            body { margin: 0; padding: 0; }
+          }
+          .card {
+            width: 6in;
+            height: 3in;
+            border: 1px solid #aaa;
+            margin: 0.5in auto;
+            padding: 1em;
+            box-sizing: border-box;
+            font-family: sans-serif;
+          }
+        </style>
+      </head>
+      <body onload="window.print()">
+  `;
+
+        for (const card of queue) {
+          html += `
+      <div class="card">
+        <h2>${card.title}</h2>
+        <strong>${card.author}</strong>
+        <p>${card.summary}</p>
+        <hr>
+        <div style="text-align: right">B&N Ocala</div>
+      </div>
+    `;
+        }
+
+        html += `</body></html>`;
+
+        printWindow.document.write(html);
         printWindow.document.close();
-        printWindow.focus();
-        printWindow.print();
-      }
-
-      function clearCards() {
-        cardQueue.length = 0;
-        renderCards();
-      }
-
-      function addCardFromButton() {
-        document
-          .getElementById("cardForm")
-          .dispatchEvent(
-            new Event("submit", { cancelable: true, bubbles: true })
-          );
       }
 
       function addCard(event) {
