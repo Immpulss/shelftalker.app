@@ -146,14 +146,15 @@
       }
 
       .delete-button {
-  position: absolute;
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: red;
-  z-index: 100;
-}
+        position: absolute;
+        top: 4px;
+        right: 6px;
+        background: none;
+        border: none;
+        font-size: 18px;
+        cursor: pointer;
+        color: #888;
+      }
 
       .generate-btn {
         font-size: 18px;
@@ -325,14 +326,8 @@
     
       @media print {
         .card .delete-button {
-  position: absolute;
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: red;
-  z-index: 100;
-}
+          display: none !important;
+        }
       }
 
     
@@ -378,21 +373,7 @@
   }
 }
 
-    
-.button-container {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  background-color: #eee;
-  border-radius: 6px;
-  padding: 4px;
-  z-index: 100;
-}
-
-</style>
+    </style>
   </head>
   <body>
     <div class="top-controls">
@@ -575,8 +556,8 @@
           <div class="footer-line-alt"></div>
           <div class="footer-text">B&amp;N Ocala</div>
         </div>
-        <div class="button-container"><button class="delete-button" onclick="deleteCard(${j})">✖</button>
-        <button class="delete-button" style="top: 34px;" onclick="editCard(${j})">✏️</button></div>
+        <button class="delete-button" onclick="deleteCard(${j})">✖</button>
+        <button class="delete-button" style="top: 34px;" onclick="editCard(${j})">✏️</button>
       `;
       sheet.appendChild(card);
     }
@@ -685,14 +666,13 @@ function editCard(index) {
 
 
 
-
 <script>
   document.getElementById("downloadPDF").addEventListener("click", function () {
     const element = document.getElementById("container");
 
-    // Temporarily hide delete and edit buttons
-    const buttons = element.querySelectorAll(".delete-button");
-    buttons.forEach(btn => btn.style.display = "none");
+    // Temporarily hide delete buttons
+    const deleteButtons = element.querySelectorAll(".delete-button");
+    deleteButtons.forEach(btn => btn.classList.add("hide-in-pdf"));
 
     const opt = {
       margin:       0,
@@ -703,11 +683,11 @@ function editCard(index) {
     };
 
     html2pdf().set(opt).from(element).save().then(() => {
-      // Restore buttons
-      buttons.forEach(btn => btn.style.display = "");
+      // Restore delete buttons
+      deleteButtons.forEach(btn => btn.classList.remove("hide-in-pdf"));
     });
   });
 </script>
-</body>
 
+</body>
 </html>
