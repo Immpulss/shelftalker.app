@@ -513,42 +513,56 @@
 
       function printCards() {
         const cards = document.getElementById("printQueue").innerHTML;
-        const printWindow = window.open("", "", "width=800,height=600");
+
+        // Try to open a new window
+        const printWindow = window.open("", "_blank");
+
+        if (!printWindow) {
+          alert("Popup was blocked. Please allow popups for this site.");
+          return;
+        }
+
+        // Write HTML to the new window
         printWindow.document.write(`
-    <html>
-      <head>
-        <title>Printable Shelf Talker Cards</title>
-        <style>
-          @media print {
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Print Cards</title>
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 0;
+            }
+
             body {
               margin: 0;
               padding: 0;
+              font-family: sans-serif;
             }
 
             .card {
+              width: 15cm;
+              height: 5.5cm;
+              border: 1px solid #aaa;
+              padding: 16px 2.5cm 16px 1.8cm;
+              box-sizing: border-box;
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
+              position: relative;
+              margin: 0;
               page-break-inside: avoid;
               break-inside: avoid;
             }
+          </style>
+        </head>
+        <body onload="window.print(); window.close();">
+          ${cards}
+        </body>
+      </html>
+    `);
 
-            @page {
-              margin: 0;
-            }
-          }
-
-          .card {
-            /* Your fixed size here (in inches or pixels) */
-            width: 4in;
-            height: 6in;
-            margin: 0.25in auto;
-          }
-        </style>
-      </head>
-      <body onload="window.print(); window.close();">
-        ${cards}
-      </body>
-    </html>
-  `);
-        printWindow.document.close();
+        printWindow.document.close(); // Finish writing and render content
       }
 
       function clearCards() {
