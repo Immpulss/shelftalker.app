@@ -256,6 +256,43 @@
         width: 100%;
         box-sizing: border-box;
       }
+
+      @media (max-width: 600px) {
+        body {
+          padding: 10px;
+          align-items: stretch;
+        }
+
+        .form,
+        .scan-wrapper,
+        .top-controls {
+          max-width: none;
+          width: 100%;
+          padding: 0;
+        }
+
+        .form input,
+        .form textarea,
+        .form button,
+        .scan-wrapper button,
+        .top-btn,
+        .generate-btn,
+        .add-btn {
+          font-size: 18px;
+          padding: 16px;
+          height: auto;
+          border-radius: 8px;
+        }
+
+        .generate-btn,
+        .add-btn {
+          margin-top: 12px;
+        }
+
+        #summary {
+          height: 180px;
+        }
+      }
     </style>
   </head>
   <body>
@@ -379,11 +416,14 @@
         showSpinner();
 
         try {
-          const response = await fetch("https://summary-robot.onrender.com/api/summary", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ title, author }),
-          });
+          const response = await fetch(
+            "https://summary-robot.onrender.com/api/summary",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ title, author }),
+            }
+          );
 
           const data = await response.json();
           const summary = data.summary;
