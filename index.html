@@ -311,6 +311,20 @@
         overscroll-behavior: contain;
         touch-action: none;
       }
+
+      #crosshair {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 200px;
+        height: 200px;
+        border: 2px solid rgba(255, 255, 255, 0.5);
+        transform: translate(-50%, -50%);
+        z-index: 1000;
+        pointer-events: none;
+        border-radius: 12px;
+        box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+      }
     </style>
   </head>
   <body>
@@ -373,6 +387,7 @@
               aspectRatio: 1.5, // Keeps it vertical-ish
             },
             (decodedText) => {
+              playBeep();
               document.getElementById("isbn").value = decodedText;
               html5QrCode.stop().then(() => {
                 document.getElementById("scannerOverlay").style.display =
@@ -404,6 +419,24 @@
               document.getElementById("scannerOverlay").style.display = "none";
             });
         }
+      }
+
+      function playBeep() {
+        const context = new (window.AudioContext ||
+          window.webkitAudioContext)();
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+
+        oscillator.type = "sine";
+        oscillator.frequency.value = 1000; // Hz
+        oscillator.connect(gain);
+        gain.connect(context.destination);
+        oscillator.start();
+        gain.gain.exponentialRampToValueAtTime(
+          0.00001,
+          context.currentTime + 0.2
+        );
+        oscillator.stop(context.currentTime + 0.2);
       }
 
       function toTitleCase(str) {
@@ -566,6 +599,7 @@
         ❌ Close
       </button>
       <div id="reader" style="width: 100%; height: 100%"></div>
+      <div id="crosshair"></div>
     </div>
   </body>
 </html>
