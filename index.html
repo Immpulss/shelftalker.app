@@ -316,14 +316,37 @@
         position: absolute;
         top: 50%;
         left: 50%;
-        width: 200px;
-        height: 200px;
-        border: 2px solid rgba(255, 255, 255, 0.5);
+        width: 150px;
+        height: 150px;
         transform: translate(-50%, -50%);
         z-index: 1000;
         pointer-events: none;
-        border-radius: 12px;
-        box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+      }
+
+      #crosshair::before,
+      #crosshair::after {
+        content: "";
+        position: absolute;
+        background: white;
+        opacity: 0.8;
+      }
+
+      /* Horizontal line */
+      #crosshair::before {
+        top: 50%;
+        left: 0;
+        width: 100%;
+        height: 2px;
+        transform: translateY(-1px);
+      }
+
+      /* Vertical line */
+      #crosshair::after {
+        left: 50%;
+        top: 0;
+        width: 2px;
+        height: 100%;
+        transform: translateX(-1px);
       }
     </style>
   </head>
@@ -422,21 +445,10 @@
       }
 
       function playBeep() {
-        const context = new (window.AudioContext ||
-          window.webkitAudioContext)();
-        const oscillator = context.createOscillator();
-        const gain = context.createGain();
-
-        oscillator.type = "sine";
-        oscillator.frequency.value = 1000; // Hz
-        oscillator.connect(gain);
-        gain.connect(context.destination);
-        oscillator.start();
-        gain.gain.exponentialRampToValueAtTime(
-          0.00001,
-          context.currentTime + 0.2
-        );
-        oscillator.stop(context.currentTime + 0.2);
+        const audio = document.getElementById("beep");
+        if (audio) {
+          audio.play().catch((e) => console.warn("Beep blocked by browser", e));
+        }
       }
 
       function toTitleCase(str) {
@@ -601,5 +613,8 @@
       <div id="reader" style="width: 100%; height: 100%"></div>
       <div id="crosshair"></div>
     </div>
+
+    <audio id="beep" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg" preload="auto"></audio>
+
   </body>
 </html>
