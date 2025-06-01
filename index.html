@@ -350,6 +350,29 @@
       }
     }
 
+    
+@media (max-width: 600px) {
+  #card-wrapper {
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  #container {
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .sheet {
+    flex: 0 0 100%;
+    scroll-snap-align: start;
+    display: flex;
+    justify-content: center;
+  }
+}
+
     </style>
   </head>
   <body>
