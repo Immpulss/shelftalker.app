@@ -89,11 +89,22 @@
         font-weight: bold;
         margin: 4px 0 12px 0;
       }
+      .card > div:first-child {
+        overflow: hidden;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+
       .summary {
         font-family: Georgia, serif;
         font-size: 13px;
         font-weight: normal;
         line-height: 1.4;
+        overflow: hidden;
+        flex: 1;
+        min-height: 0;
       }
       .footer-container {
         display: flex;
@@ -713,9 +724,56 @@
                   <button class="edit-button" onclick="editCard(${j})">✏️</button>
                 `;
             sheet.appendChild(card);
+            
+            // Apply dynamic text fitting to the summary
+            const summaryElement = card.querySelector('.summary');
+            fitTextToContainer(summaryElement);
           }
           container.appendChild(sheet);
         }
+      }
+
+      function fitTextToContainer(summaryElement) {
+        const card = summaryElement.closest('.card');
+        const footerContainer = card.querySelector('.footer-container');
+        const container = summaryElement;
+        const originalFontSize = 13;
+        const minimumFontSize = 10;
+        let fontSize = originalFontSize;
+        
+        // Force layout calculation
+        card.offsetHeight;
+        
+        // Reset footer to original position
+        footerContainer.style.marginTop = '8px';
+        container.style.fontSize = fontSize + 'px';
+        
+        // Wait for layout then check
+        setTimeout(() => {
+          // Try reducing font size first
+          while (isOverflowing(container) && fontSize > minimumFontSize) {
+            fontSize -= 0.5;
+            container.style.fontSize = fontSize + 'px';
+          }
+          
+          // If still overflowing, try moving footer down
+          let footerMargin = 8;
+          const minFooterMargin = 4;
+          
+          while (isOverflowing(container) && footerMargin > minFooterMargin) {
+            footerMargin -= 1;
+            footerContainer.style.marginTop = footerMargin + 'px';
+          }
+          
+          // Final fallback: clean cutoff
+          if (isOverflowing(container)) {
+            container.style.overflow = 'hidden';
+          }
+        }, 10);
+      }
+
+      function isOverflowing(element) {
+        return element.scrollHeight > element.offsetHeight + 2; // 2px tolerance
       }
 
       function printCards() {
