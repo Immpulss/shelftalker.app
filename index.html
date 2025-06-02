@@ -340,6 +340,17 @@
       .hide-in-pdf {
         display: none !important;
       }
+
+      .edit-button {
+        position: absolute;
+        top: 34px;
+        right: 6px;
+        background: none;
+        border: none;
+        font-size: 18px;
+        cursor: pointer;
+        color: #555;
+      }
     </style>
   </head>
   <body>
@@ -367,6 +378,13 @@
         onblur="handleISBN()"
         onkeydown="if(event.key==='Enter'){ event.preventDefault(); handleISBN(); }"
       />
+      <div
+        id="isbnError"
+        style="color: red; font-size: 14px; margin-top: 4px; display: none"
+      >
+        ISBN not found.
+      </div>
+
       <input type="text" id="title" placeholder="Book Title" required />
       <input type="text" id="author" placeholder="Author Name" required />
       <button type="button" class="generate-btn" onclick="generateSummary()">
@@ -450,20 +468,44 @@
 
       async function handleISBN() {
         const isbn = document.getElementById("isbn").value.trim();
+        const errorBox = document.getElementById("isbnError");
+        errorBox.style.display = "none"; // reset
 
         if (!isbn) return;
-        const res = await fetch(
+
+        // Try Open Library first
+        const openLibRes = await fetch(
           `https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`
         );
-        const data = await res.json();
-        const book = data[`ISBN:${isbn}`];
-        if (book) {
-          const title = book.title || "";
-          const author = book.authors?.[0]?.name || "";
-          if (title && author) {
-            document.getElementById("title").value = title;
-            document.getElementById("author").value = author;
+        const openLibData = await openLibRes.json();
+        const openLibBook = openLibData[`ISBN:${isbn}`];
+
+        let title = openLibBook?.title || "";
+        let author = openLibBook?.authors?.[0]?.name || "";
+
+        // If Open Library fails, try Google Books
+        if (!title || !author) {
+          try {
+            const googleRes = await fetch(
+              `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`
+            );
+            const googleData = await googleRes.json();
+            const item = googleData.items?.[0]?.volumeInfo;
+            if (item) {
+              title = title || item.title || "";
+              author = author || item.authors?.[0] || "";
+            }
+          } catch (err) {
+            console.error("Google Books lookup failed:", err);
           }
+        }
+
+        // Show error if still nothing
+        if (!title && !author) {
+          errorBox.style.display = "block";
+        } else {
+          if (title) document.getElementById("title").value = title;
+          if (author) document.getElementById("author").value = author;
         }
       }
 
@@ -521,7 +563,8 @@
                     <div class="footer-line-alt"></div>
                     <div class="footer-text">B&amp;N Ocala</div>
                   </div>
-                  <button class="delete-button" onclick="deleteCard(${j})">✖</button>
+                  <button class="delete-button" onclick="deleteCard(${j})">❌</button>
+                  <button class="edit-button" onclick="editCard(${j})">✏️</button>
                 `;
             sheet.appendChild(card);
           }
@@ -562,6 +605,23 @@
           renderCards();
         }
       }
+
+      function editCard(index) {
+        const card = cardQueue[index];
+        document.getElementById("title").value = card.title;
+        document.getElementById("author").value = card.author;
+        document.getElementById("summary").value = card.summary;
+
+        // Remove from queue and rerender without it
+        cardQueue.splice(index, 1);
+        renderCards();
+
+        // Scroll to form for visibility on mobile
+        document
+          .getElementById("cardForm")
+          .scrollIntoView({ behavior: "smooth" });
+      }
+
       function deleteCard(index) {
         cardQueue.splice(index, 1);
         renderCards();
@@ -620,9 +680,11 @@
         .addEventListener("click", function () {
           const element = document.getElementById("container");
 
-          // Temporarily hide delete buttons
-          const deleteButtons = element.querySelectorAll(".delete-button");
-          deleteButtons.forEach((btn) => btn.classList.add("hide-in-pdf"));
+          // Temporarily hide delete and edit buttons
+          const hideButtons = element.querySelectorAll(
+            ".delete-button, .edit-button"
+          );
+          hideButtons.forEach((btn) => btn.classList.add("hide-in-pdf"));
 
           const opt = {
             margin: 0,
@@ -637,10 +699,8 @@
             .from(element)
             .save()
             .then(() => {
-              // Restore delete buttons
-              deleteButtons.forEach((btn) =>
-                btn.classList.remove("hide-in-pdf")
-              );
+              // Restore buttons after export
+              hideButtons.forEach((btn) => btn.classList.remove("hide-in-pdf"));
             });
         });
     </script>
