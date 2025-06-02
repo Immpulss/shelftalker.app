@@ -409,13 +409,6 @@
           font-size: 28px;
         }
 
-        /* Mobile preview zoom-out - only when not generating PDF */
-        .preview-page:not(.generating-pdf) {
-          padding: 20px;
-          min-width: 600px;
-          box-sizing: border-box;
-        }
-
         .top-controls {
           /* Keep horizontal layout for top buttons */
           flex-direction: row;
@@ -923,10 +916,6 @@
         .getElementById("downloadPDF")
         .addEventListener("click", function () {
           const element = document.getElementById("container");
-          const previewPage = document.getElementById("previewPage");
-
-          // Disable mobile adjustments during PDF generation
-          previewPage.classList.add('generating-pdf');
 
           // Temporarily hide delete and edit buttons
           const hideButtons = element.querySelectorAll(
@@ -947,9 +936,8 @@
             .from(element)
             .save()
             .then(() => {
-              // Restore buttons and mobile adjustments after export
+              // Restore buttons after export
               hideButtons.forEach((btn) => btn.classList.remove("hide-in-pdf"));
-              previewPage.classList.remove('generating-pdf');
             });
         });
     </script>
