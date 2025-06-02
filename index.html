@@ -348,6 +348,14 @@
         display: none !important;
       }
 
+      
+      .card-wrapper {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        overflow-x: hidden;
+      }
+
       .edit-button {
         position: absolute;
         top: 74px;
@@ -565,6 +573,8 @@
           const sheet = document.createElement("div");
           sheet.className = "sheet";
           for (let j = i; j < i + 5 && j < cardQueue.length; j++) {
+            const wrapper = document.createElement("div");
+            wrapper.className = "card-wrapper";
             const card = document.createElement("div");
             card.className = "card";
             card.innerHTML = `
@@ -580,7 +590,8 @@
                   <button class="delete-button" onclick="deleteCard(${j})">❌</button>
                   <button class="edit-button" onclick="editCard(${j})">✏️</button>
                 `;
-            sheet.appendChild(card);
+            wrapper.appendChild(card);
+            sheet.appendChild(wrapper);
           }
           container.appendChild(sheet);
         }
@@ -593,6 +604,7 @@
       function clearCards() {
         cardQueue.length = 0;
         renderCards();
+applyCardScaling();
       }
 
       function addCardFromButton() {
@@ -617,6 +629,7 @@
           document.getElementById("summary").value = "";
           document.getElementById("isbn").value = "";
           renderCards();
+applyCardScaling();
         }
       }
 
@@ -629,6 +642,7 @@
         // Remove from queue and rerender without it
         cardQueue.splice(index, 1);
         renderCards();
+applyCardScaling();
 
         // Scroll to form for visibility on mobile
         document
@@ -639,9 +653,11 @@
       function deleteCard(index) {
         cardQueue.splice(index, 1);
         renderCards();
+applyCardScaling();
       }
 
       renderCards();
+applyCardScaling();
       function showSpinner() {
         document.getElementById("spinner").style.display = "block";
       }
@@ -649,7 +665,20 @@
       function hideSpinner() {
         document.getElementById("spinner").style.display = "none";
       }
-    </script>
+    
+function applyCardScaling() {
+  const wrappers = document.querySelectorAll('.card-wrapper');
+  wrappers.forEach((wrapper) => {
+    const card = wrapper.querySelector('.card');
+    const screenWidth = wrapper.clientWidth;
+    const designWidth = 566; // 15cm ~ 566px at 96dpi
+    const scale = Math.min(1, screenWidth / designWidth);
+    card.style.transform = `scale(${scale})`;
+    card.style.transformOrigin = 'top left';
+  });
+}
+
+</script>
     <div
       id="spinner"
       style="
@@ -700,6 +729,14 @@
           );
           hideButtons.forEach((btn) => btn.classList.add("hide-in-pdf"));
 
+          const scaledCards = element.querySelectorAll(".card");
+          const previousTransforms = [];
+          scaledCards.forEach((card, index) => {
+            previousTransforms[index] = card.style.transform;
+            card.style.transform = "none";
+          });
+
+
           const opt = {
             margin: 0,
             filename: "shelftalkers.pdf",
@@ -715,6 +752,11 @@
             .then(() => {
               // Restore buttons after export
               hideButtons.forEach((btn) => btn.classList.remove("hide-in-pdf"));
+
+              scaledCards.forEach((card, index) => {
+                card.style.transform = previousTransforms[index];
+              });
+
             });
         });
     </script>
