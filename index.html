@@ -377,7 +377,6 @@
 
         .form,
         .scan-wrapper,
-        .top-controls,
         .card-counter {
           max-width: none;
           width: 100%;
@@ -388,7 +387,6 @@
         .form textarea,
         .form button,
         .scan-wrapper button,
-        .top-btn,
         .generate-btn,
         .add-btn,
         .back-button {
@@ -412,13 +410,19 @@
         }
 
         .top-controls {
-          flex-direction: column;
-          align-items: center;
+          /* Keep horizontal layout for top buttons */
+          flex-direction: row;
+          justify-content: center;
+          gap: 10px;
         }
 
         .top-btn {
-          width: 100%;
-          max-width: 400px;
+          font-size: 18px;
+          padding: 16px;
+          height: auto;
+          border-radius: 8px;
+          flex: 1;
+          max-width: 200px;
         }
 
         .preview-controls {
@@ -781,9 +785,19 @@
       }
 
       function clearCards() {
-        cardQueue.length = 0;
-        updateCardCounter();
-        renderCards();
+        // Don't clear if queue is empty
+        if (cardQueue.length === 0) {
+          return;
+        }
+        
+        // Ask for confirmation
+        const confirmed = confirm(`Are you sure you want to clear all ${cardQueue.length} cards from the queue? This cannot be undone.`);
+        
+        if (confirmed) {
+          cardQueue.length = 0;
+          updateCardCounter();
+          renderCards();
+        }
       }
 
       function addCardFromButton() {
