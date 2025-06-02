@@ -21,15 +21,7 @@
         size: 8.5in 11in;
         margin: 0;
       }
-      @media print {
-        .top-controls,
-        .scan-wrapper,
-        .form,
-        .controls,
-        .delete-button,
-        #barcode-scanner {
-          display: none !important;
-        }
+      
         body {
           margin: 0;
           padding: 0;
@@ -44,15 +36,7 @@
         align-items: center;
       }
 
-      @media print {
-        footer,
-        .footer,
-        .page-footer,
-        .site-footer,
-        #github-corner,
-        body::after {
-          display: none !important;
-        }
+      
       }
 
       .sheet {
@@ -338,10 +322,7 @@
         touch-action: none;
       }
 
-      @media print {
-        .card .delete-button {
-          display: none !important;
-        }
+      
       }
 
       .hide-in-pdf {
@@ -401,10 +382,7 @@
         }
       }
 
-      @media print {
-        .card-wrapper {
-          max-width: none;
-        }
+      
 
         .card {
           width: 15cm !important;
@@ -807,6 +785,27 @@ function applyCardScaling() {
           hideButtons.forEach((btn) => btn.classList.add("hide-in-pdf"));
 
           const scaledCards = element.querySelectorAll(".card");
+          const previousStyles = [];
+
+          scaledCards.forEach((card, index) => {
+            previousStyles[index] = {
+              width: card.style.width,
+              height: card.style.height,
+              padding: card.style.padding
+            };
+            card.style.width = "15cm";
+            card.style.height = "5.5cm";
+            card.style.padding = "16px 2.5cm 16px 1.8cm";
+            const title = card.querySelector(".title");
+            const author = card.querySelector(".author");
+            const summary = card.querySelector(".summary");
+            if (title) title.style.fontSize = "28px";
+            if (author) author.style.fontSize = "16px";
+            if (summary) summary.style.fontSize = "13px";
+          });
+
+
+          const scaledCards = element.querySelectorAll(".card");
           const previousTransforms = [];
           scaledCards.forEach((card, index) => {
             previousTransforms[index] = card.style.transform;
@@ -829,6 +828,13 @@ function applyCardScaling() {
             .then(() => {
               // Restore buttons after export
               hideButtons.forEach((btn) => btn.classList.remove("hide-in-pdf"));
+
+              scaledCards.forEach((card, index) => {
+                card.style.width = previousStyles[index].width;
+                card.style.height = previousStyles[index].height;
+                card.style.padding = previousStyles[index].padding;
+              });
+
 
               scaledCards.forEach((card, index) => {
                 card.style.transform = previousTransforms[index];
