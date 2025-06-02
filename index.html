@@ -21,7 +21,15 @@
         size: 8.5in 11in;
         margin: 0;
       }
-      
+      @media print {
+        .top-controls,
+        .scan-wrapper,
+        .form,
+        .controls,
+        .delete-button,
+        #barcode-scanner {
+          display: none !important;
+        }
         body {
           margin: 0;
           padding: 0;
@@ -36,7 +44,15 @@
         align-items: center;
       }
 
-      
+      @media print {
+        footer,
+        .footer,
+        .page-footer,
+        .site-footer,
+        #github-corner,
+        body::after {
+          display: none !important;
+        }
       }
 
       .sheet {
@@ -322,93 +338,14 @@
         touch-action: none;
       }
 
-      
+      @media print {
+        .card .delete-button {
+          display: none !important;
+        }
       }
 
       .hide-in-pdf {
         display: none !important;
-      }
-
-      
-      
-      .card-wrapper {
-        width: 100%;
-        max-width: 400px;
-        margin: 0 auto;
-        overflow-x: hidden;
-      }
-
-      .card {
-        width: 100%;
-        height: auto;
-        aspect-ratio: 15 / 5.5;
-        transform: none !important;
-        padding: 16px 10% 16px 10%;
-      }
-
-      .title {
-        font-size: 6vw;
-      }
-
-      .author {
-        font-size: 4vw;
-      }
-
-      .summary {
-        font-size: 3.3vw;
-      }
-
-      @media (min-width: 600px) {
-        .card-wrapper {
-          max-width: none;
-        }
-
-        .card {
-          width: 15cm;
-          height: 5.5cm;
-          padding: 16px 2.5cm 16px 1.8cm;
-        }
-
-        .title {
-          font-size: 28px;
-        }
-
-        .author {
-          font-size: 16px;
-        }
-
-        .summary {
-          font-size: 13px;
-        }
-      }
-
-      
-
-        .card {
-          width: 15cm !important;
-          height: 5.5cm !important;
-          transform: none !important;
-          padding: 16px 2.5cm 16px 1.8cm !important;
-        }
-
-        .title {
-          font-size: 28px !important;
-        }
-
-        .author {
-          font-size: 16px !important;
-        }
-
-        .summary {
-          font-size: 13px !important;
-        }
-      }
-
-      .card-wrapper {
-        width: 100%;
-        display: flex;
-        justify-content: center;
-        overflow-x: hidden;
       }
 
       .edit-button {
@@ -481,8 +418,6 @@
 
     <div id="barcode-scanner"></div>
     <div id="container"></div>
-    <div id="print-container" style="display: none;"></div>
-
 
     <script>
       const cardQueue = [];
@@ -630,8 +565,6 @@
           const sheet = document.createElement("div");
           sheet.className = "sheet";
           for (let j = i; j < i + 5 && j < cardQueue.length; j++) {
-            const wrapper = document.createElement("div");
-            wrapper.className = "card-wrapper";
             const card = document.createElement("div");
             card.className = "card";
             card.innerHTML = `
@@ -647,8 +580,7 @@
                   <button class="delete-button" onclick="deleteCard(${j})">❌</button>
                   <button class="edit-button" onclick="editCard(${j})">✏️</button>
                 `;
-            wrapper.appendChild(card);
-            sheet.appendChild(wrapper);
+            sheet.appendChild(card);
           }
           container.appendChild(sheet);
         }
@@ -661,7 +593,6 @@
       function clearCards() {
         cardQueue.length = 0;
         renderCards();
-applyCardScaling();
       }
 
       function addCardFromButton() {
@@ -686,7 +617,6 @@ applyCardScaling();
           document.getElementById("summary").value = "";
           document.getElementById("isbn").value = "";
           renderCards();
-applyCardScaling();
         }
       }
 
@@ -699,7 +629,6 @@ applyCardScaling();
         // Remove from queue and rerender without it
         cardQueue.splice(index, 1);
         renderCards();
-applyCardScaling();
 
         // Scroll to form for visibility on mobile
         document
@@ -710,11 +639,9 @@ applyCardScaling();
       function deleteCard(index) {
         cardQueue.splice(index, 1);
         renderCards();
-applyCardScaling();
       }
 
       renderCards();
-applyCardScaling();
       function showSpinner() {
         document.getElementById("spinner").style.display = "block";
       }
@@ -722,20 +649,7 @@ applyCardScaling();
       function hideSpinner() {
         document.getElementById("spinner").style.display = "none";
       }
-    
-function applyCardScaling() {
-  const wrappers = document.querySelectorAll('.card-wrapper');
-  wrappers.forEach((wrapper) => {
-    const card = wrapper.querySelector('.card');
-    const screenWidth = wrapper.clientWidth;
-    const designWidth = 566; // 15cm ~ 566px at 96dpi
-    const scale = Math.min(1, screenWidth / designWidth);
-    card.style.transform = `scale(${scale})`;
-    card.style.transformOrigin = 'top left';
-  });
-}
-
-</script>
+    </script>
     <div
       id="spinner"
       style="
@@ -786,35 +700,6 @@ function applyCardScaling() {
           );
           hideButtons.forEach((btn) => btn.classList.add("hide-in-pdf"));
 
-          const scaledCards = element.querySelectorAll(".card");
-          const previousStyles = [];
-
-          scaledCards.forEach((card, index) => {
-            previousStyles[index] = {
-              width: card.style.width,
-              height: card.style.height,
-              padding: card.style.padding
-            };
-            card.style.width = "15cm";
-            card.style.height = "5.5cm";
-            card.style.padding = "16px 2.5cm 16px 1.8cm";
-            const title = card.querySelector(".title");
-            const author = card.querySelector(".author");
-            const summary = card.querySelector(".summary");
-            if (title) title.style.fontSize = "28px";
-            if (author) author.style.fontSize = "16px";
-            if (summary) summary.style.fontSize = "13px";
-          });
-
-
-          const scaledCards = element.querySelectorAll(".card");
-          const previousTransforms = [];
-          scaledCards.forEach((card, index) => {
-            previousTransforms[index] = card.style.transform;
-            card.style.transform = "none";
-          });
-
-
           const opt = {
             margin: 0,
             filename: "shelftalkers.pdf",
@@ -830,18 +715,6 @@ function applyCardScaling() {
             .then(() => {
               // Restore buttons after export
               hideButtons.forEach((btn) => btn.classList.remove("hide-in-pdf"));
-
-              scaledCards.forEach((card, index) => {
-                card.style.width = previousStyles[index].width;
-                card.style.height = previousStyles[index].height;
-                card.style.padding = previousStyles[index].padding;
-              });
-
-
-              scaledCards.forEach((card, index) => {
-                card.style.transform = previousTransforms[index];
-              });
-
             });
         });
     </script>
