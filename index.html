@@ -349,6 +349,83 @@
       }
 
       
+      
+      .card-wrapper {
+        width: 100%;
+        max-width: 400px;
+        margin: 0 auto;
+        overflow-x: hidden;
+      }
+
+      .card {
+        width: 100%;
+        height: auto;
+        aspect-ratio: 15 / 5.5;
+        transform: none !important;
+        padding: 16px 10% 16px 10%;
+      }
+
+      .title {
+        font-size: 6vw;
+      }
+
+      .author {
+        font-size: 4vw;
+      }
+
+      .summary {
+        font-size: 3.3vw;
+      }
+
+      @media (min-width: 600px) {
+        .card-wrapper {
+          max-width: none;
+        }
+
+        .card {
+          width: 15cm;
+          height: 5.5cm;
+          padding: 16px 2.5cm 16px 1.8cm;
+        }
+
+        .title {
+          font-size: 28px;
+        }
+
+        .author {
+          font-size: 16px;
+        }
+
+        .summary {
+          font-size: 13px;
+        }
+      }
+
+      @media print {
+        .card-wrapper {
+          max-width: none;
+        }
+
+        .card {
+          width: 15cm !important;
+          height: 5.5cm !important;
+          transform: none !important;
+          padding: 16px 2.5cm 16px 1.8cm !important;
+        }
+
+        .title {
+          font-size: 28px !important;
+        }
+
+        .author {
+          font-size: 16px !important;
+        }
+
+        .summary {
+          font-size: 13px !important;
+        }
+      }
+
       .card-wrapper {
         width: 100%;
         display: flex;
