@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+!DOCTYPE html>
 <html>
   <head>
     <title>Printable Shelf Talker Cards</title>
@@ -549,6 +549,7 @@
 
     <script>
       const cardQueue = [];
+      let currentBookDescription = "";
       let scanner;
 
       function updateCardCounter() {
@@ -627,54 +628,79 @@
         return str.toLowerCase().replace(/\b(\w)/g, (s) => s.toUpperCase());
       }
 
-      async function handleISBN() {
-        const isbn = document.getElementById("isbn").value.trim();
-        const errorBox = document.getElementById("isbnError");
-        errorBox.style.display = "none"; // reset
+  async function handleISBN() {
+  const isbn = document.getElementById("isbn").value.trim();
+  const errorBox = document.getElementById("isbnError");
 
-        if (!isbn) return;
+  errorBox.style.display = "none";
 
-        // Try Open Library first
-        const openLibRes = await fetch(
-          `https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`
-        );
-        const openLibData = await openLibRes.json();
-        const openLibBook = openLibData[`ISBN:${isbn}`];
+  if (!isbn) return;
 
-        let title = openLibBook?.title || "";
-        let author = openLibBook?.authors?.[0]?.name || "";
+  let title = "";
+  let author = "";
+  let description = "";
 
-        // If Open Library fails, try Google Books
-        if (!title || !author) {
-          try {
-            const googleRes = await fetch(
-              `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`
-            );
-            const googleData = await googleRes.json();
-            const item = googleData.items?.[0]?.volumeInfo;
-            if (item) {
-              title = title || item.title || "";
-              author = author || item.authors?.[0] || "";
-            }
-          } catch (err) {
-            console.error("Google Books lookup failed:", err);
-          }
-        }
+  // 1. Try Google Books first
+  try {
+    const API_KEY = "AIzaSyAQ4Ex0kn0SjjWI_YkRMFbBxPiQYH8r_bU";
 
-        // Show error if still nothing
-        if (!title && !author) {
-          errorBox.style.display = "block";
-        } else {
-          if (title) document.getElementById("title").value = title;
-          if (author) document.getElementById("author").value = author;
-        }
+    const googleRes = await fetch(
+      `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&key=${API_KEY}`
+    );
+    const googleData = await googleRes.json();
+    const item = googleData.items?.[0]?.volumeInfo;
+
+    if (item) {
+      title = item.title || "";
+      author = item.authors?.[0] || "";
+      description = item.description || "";
+      currentBookDescription = description;
+    }
+    console.log("Description:", description);
+  } catch (err) {
+    console.error("Google Books lookup failed:", err);
+  }
+
+  // 2. If Google Books didn't find enough, try Open Library
+  if (!title || !author) {
+    try {
+      const openLibRes = await fetch(
+        `https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`
+      );
+      const openLibData = await openLibRes.json();
+      const openLibBook = openLibData[`ISBN:${isbn}`];
+
+      if (openLibBook) {
+        title = title || openLibBook.title || "";
+        author = author || openLibBook.authors?.[0]?.name || "";
       }
+    } catch (err) {
+      console.error("Open Library lookup failed:", err);
+    }
+  }
+  currentBookDescription = description;
+  
+  // 3. Show result or error
+  if (!title && !author) {
+    errorBox.style.display = "block";
+  } else {
+    document.getElementById("title").value = title;
+    document.getElementById("author").value = author;
+  }
+}
 
       async function generateSummary() {
         const title = document.getElementById("title").value.trim();
         const author = document.getElementById("author").value.trim();
+        const description = currentBookDescription.trim();
+
         if (!title || !author) {
           alert("Please enter or resolve title and author first.");
+          return;
+        }
+
+        if (!description) {
+          alert("No book description was found to summarize.");
           return;
         }
 
@@ -686,12 +712,13 @@
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ title, author }),
+              body: JSON.stringify({ title, author, description }),
             }
           );
 
           const data = await response.json();
           const summary = data.summary;
+          
           if (summary) {
             document.getElementById("summary").value = summary;
           } else {
