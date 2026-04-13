@@ -625,8 +625,25 @@
       }
 
       function toTitleCase(str) {
-        return str.toLowerCase().replace(/\b(\w)/g, (s) => s.toUpperCase());
+        if (!str) return "";
+
+        return str
+        .toLowerCase()
+        .split(" ")
+        .map((word) => {
+      // Keep words with & fully uppercase, like B&N
+          if (word.includes("&")) {
+          return word.toUpperCase();
       }
+
+      // Capitalize first letter and any letter after a hyphen,
+      // but NOT after an apostrophe
+      return word.replace(/(^[a-z])|(-[a-z])/g, (match) =>
+        match.toUpperCase()
+      );
+    })
+    .join(" ");
+}
 
   async function handleISBN() {
   const isbn = document.getElementById("isbn").value.trim();
