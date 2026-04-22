@@ -504,7 +504,6 @@
           placeholder="ISBN Number"
           inputmode="numeric"
           pattern="[0-9]"
-          onblur="handleISBN()"
           onkeydown="if(event.key==='Enter'){ event.preventDefault(); handleISBN(); }"
         />
         <div
@@ -551,6 +550,7 @@
       const cardQueue = [];
       let currentBookDescription = "";
       let scanner;
+      let isLookingUpISBN = false;
 
       function updateCardCounter() {
         document.getElementById('cardCount').textContent = cardQueue.length;
@@ -645,66 +645,124 @@
     .join(" ");
 }
 
-  async function handleISBN() {
-  const isbn = document.getElementById("isbn").value.trim();
+ async function handleISBN() {
+  const rawIsbn = document.getElementById("isbn").value.trim();
+  const isbn = rawIsbn.replace(/[^0-9Xx]/g, "");
   const errorBox = document.getElementById("isbnError");
 
-  errorBox.style.display = "none";
+  if (!isbn || isLookingUpISBN) return;
+  isLookingUpISBN = true;
 
-  if (!isbn) return;
+  errorBox.style.display = "none";
+  errorBox.textContent = "ISBN not found.";
+
+  currentBookDescription = "";
+  document.getElementById("title").value = "";
+  document.getElementById("author").value = "";
 
   let title = "";
   let author = "";
   let description = "";
 
-  // 1. Try Google Books first
   try {
-    const API_KEY = "AIzaSyAQ4Ex0kn0SjjWI_YkRMFbBxPiQYH8r_bU";
-
-    const googleRes = await fetch(
-      `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&key=${API_KEY}`
-    );
-    const googleData = await googleRes.json();
-    const item = googleData.items?.[0]?.volumeInfo;
-
-    if (item) {
-      title = item.title || "";
-      author = item.authors?.[0] || "";
-      description = item.description || "";
-      currentBookDescription = description;
-    }
-    console.log("Description:", description);
-  } catch (err) {
-    console.error("Google Books lookup failed:", err);
-  }
-
-  // 2. If Google Books didn't find enough, try Open Library
-  if (!title || !author) {
+    // 1. Google Books first
     try {
-      const openLibRes = await fetch(
-        `https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`
-      );
-      const openLibData = await openLibRes.json();
-      const openLibBook = openLibData[`ISBN:${isbn}`];
+      const API_KEY = "AIzaSyAQ4Ex0kn0SjjWI_YkRMFbBxPiQYH8r_bU";
 
-      if (openLibBook) {
-        title = title || openLibBook.title || "";
-        author = author || openLibBook.authors?.[0]?.name || "";
+      const googleRes = await fetch(
+        `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&key=${API_KEY}`
+      );
+
+      if (!googleRes.ok) {
+        throw new Error(`Google Books lookup failed with status ${googleRes.status}`);
+      }
+
+      const googleData = await googleRes.json();
+      const item = googleData.items?.[0]?.volumeInfo;
+
+      if (item) {
+        title = item.title || "";
+        author = item.authors?.[0] || "";
+        description = item.description || "";
       }
     } catch (err) {
-      console.error("Open Library lookup failed:", err);
+      console.error("Google Books lookup failed:", err);
     }
-  }
-  currentBookDescription = description;
-  
-  // 3. Show result or error
-  if (!title && !author) {
-    errorBox.style.display = "block";
-  } else {
-    document.getElementById("title").value = title;
-    document.getElementById("author").value = author;
+
+    // 2. Open Library fallback using newer ISBN JSON endpoint
+    if (!title || !author || !description) {
+      try {
+        const olRes = await fetch(`https://openlibrary.org/isbn/${isbn}.json`);
+
+        if (olRes.ok) {
+          const edition = await olRes.json();
+
+          title = title || edition.title || "";
+
+          if (!description) {
+            if (typeof edition.description === "string") {
+              description = edition.description;
+            } else if (edition.description?.value) {
+              description = edition.description.value;
+            }
+          }
+
+          // Pull author names from author keys if needed
+          if (!author && Array.isArray(edition.authors) && edition.authors.length) {
+            const authorNames = [];
+
+            for (const a of edition.authors) {
+              if (a?.key) {
+                try {
+                  const authorRes = await fetch(`https://openlibrary.org${a.key}.json`);
+                  if (authorRes.ok) {
+                    const authorData = await authorRes.json();
+                    if (authorData.name) authorNames.push(authorData.name);
+                  }
+                } catch (err) {
+                  console.error("Open Library author lookup failed:", err);
+                }
+              }
+            }
+
+            if (authorNames.length) {
+              author = authorNames.join(", ");
+            }
+          }
+
+          // Optional fallback: first sentence if no description
+          if (!description) {
+            if (typeof edition.first_sentence === "string") {
+              description = edition.first_sentence;
+            } else if (edition.first_sentence?.value) {
+              description = edition.first_sentence.value;
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Open Library ISBN lookup failed:", err);
+      }
+    }
+
+    currentBookDescription = description;
+
+    if (!title && !author) {
+      errorBox.textContent = "ISBN not found.";
+      errorBox.style.display = "block";
+    } else {
+      document.getElementById("title").value = title;
+      document.getElementById("author").value = author;
+
+      if (!currentBookDescription) {
+        console.warn("Book found, but no description available.");
+      }
+    }
+  } finally {
+    isLookingUpISBN = false;
   }
 }
+  errorBox.style.display = "none";
+
 
       async function generateSummary() {
         const title = document.getElementById("title").value.trim();
