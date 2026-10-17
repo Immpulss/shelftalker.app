@@ -9,3 +9,19 @@ test('follows Open Library work, including object description',async()=>{const l
 test('title fallback rejects a different author',async()=>{const lookup=createLookup({fetcher:mock(url=>url.includes('q=isbn')?{items:[volume('')]}:url.includes('googleapis')?{items:[{volumeInfo:{title:'The Mysterious Benedict Society',authors:['Someone Else'],description:'Wrong plot'}}]}:{} )});assert.equal((await lookup(isbn)).description,'');});
 test('title fallback retrieves matching description',async()=>{const lookup=createLookup({fetcher:mock(url=>url.includes('q=isbn')?{items:[volume('')]}:url.includes('googleapis')?{items:[volume('Correct plot')]}:{})});assert.equal((await lookup(isbn)).description,'Correct plot');});
 test('temporary provider failure retries once and reports unavailable',async()=>{let n=0;const lookup=createLookup({delay:async()=>{},fetcher:async()=>{n++;return {ok:false,status:429}}});const result=await lookup(isbn);assert.equal(result.description,'');assert.equal(n,4);assert.equal(result.warnings.length,2);});
+test('missing edition author is recovered from work and enables title/author fallback',async()=>{
+ let fallback=false;
+ const lookup=createLookup({fetcher:mock(url=>{
+  if(url.includes('q=isbn'))return {items:[]};
+  if(url.includes('/isbn/'))return {title:'The Widow',works:[{key:'/works/OL44328974W'}]};
+  if(url.includes('/works/'))return {title:'The Widow',authors:[{author:{key:'/authors/OL39329A'}}]};
+  if(url.includes('/authors/'))return {name:'John Grisham'};
+  if(url.includes('googleapis')){fallback=true;return {items:[{volumeInfo:{title:'The Widow',authors:['John Grisham'],description:'A lawyer takes on an unexpected case.'}}]};}
+  return {};
+ })});
+ const result=await lookup('9780385548984');assert.equal(result.author,'John Grisham');assert.equal(fallback,true);assert.equal(result.description,'A lawyer takes on an unexpected case.');
+});
+test('work author recovered even when edition already contains description',async()=>{
+ const lookup=createLookup({fetcher:mock(url=>url.includes('googleapis')?{items:[]}:url.includes('/isbn/')?{title:'The Widow',description:'A lawyer takes a case.',works:[{key:'/works/OL44328974W'}]}:url.includes('/works/')?{authors:[{author:{key:'/authors/OL39329A'}}]}:{name:'John Grisham'})});
+ const result=await lookup('9780385548984');assert.equal(result.author,'John Grisham');assert.equal(result.description,'A lawyer takes a case.');
+});
