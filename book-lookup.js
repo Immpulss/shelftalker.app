@@ -52,21 +52,45 @@
       if (!book.description) {
         const edition = await json('https://openlibrary.org/isbn/' + isbn + '.json');
         if (edition) {
-          let authors = [];
-          for (const a of edition.authors || []) {
-            if (/^\/authors\/OL\d+A$/.test(a.key || '')) { const data = await json('https://openlibrary.org' + a.key + '.json'); if (data?.name) authors.push(data.name); }
-          }
-          if (!book.title) { book.title = edition.title || ''; book.author = authors.join(', '); }
-          if (norm(edition.title) === norm(book.title) && (!authors.length || matches(edition.title, authors))) {
-            book.description = clean(edition.description);
-            for (const work of edition.works || []) {
-              if (book.description) break;
-              if (/^\/works\/OL\d+W$/.test(work.key || '')) {
-                const data = await json('https://openlibrary.org' + work.key + '.json');
-                book.description = clean(data?.description);
+          // Editions can omit authors entirely; their linked works contain them.
+          const authorCache = new Map();
+          async function authorNames(records) {
+            const names = [];
+            for (const record of records || []) {
+              const key = record.author?.key || record.key;
+              if (!/^\/authors\/OL\d+A$/.test(key || '')) continue;
+              if (!authorCache.has(key)) {
+                const data = await json('https://openlibrary.org' + key + '.json');
+                authorCache.set(key, data?.name || '');
               }
+              if (authorCache.get(key)) names.push(authorCache.get(key));
             }
-            if (book.description) book.source = 'Open Library';
+            return [...new Set(names)];
+          }
+          let authors = await authorNames(edition.authors);
+          const works = [];
+          if (!clean(edition.description) || !authors.length) {
+            for (const work of edition.works || []) {
+              if (!/^\/works\/OL\d+W$/.test(work.key || '')) continue;
+              const data = await json('https://openlibrary.org' + work.key + '.json');
+              if (!data) continue;
+              if (!authors.length) authors = await authorNames(data.authors);
+              works.push(data);
+              if (authors.length && (clean(edition.description) || clean(data.description))) break;
+            }
+          }
+          if (!book.title) book.title = edition.title || '';
+          if (norm(edition.title) === norm(book.title)) {
+            if (!book.author) book.author = authors.join(', ');
+            if (!authors.length || matches(edition.title, authors)) {
+              book.description = clean(edition.description);
+              if (!book.description) {
+                for (const work of works) {
+                  if (clean(work.description)) { book.description = clean(work.description); break; }
+                }
+              }
+              if (book.description) book.source = 'Open Library';
+            }
           }
         }
       }
