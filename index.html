@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Printable Shelf Talker Cards</title>
+    <title>ShelfTalker — Test Version</title>
+    <meta name="robots" content="noindex, nofollow" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       http-equiv="Cache-Control"
@@ -22,6 +23,7 @@
         margin: 0;
       }
       @media print {
+        .test-banner,
         .top-controls,
         .scan-wrapper,
         .form,
@@ -476,6 +478,7 @@
     </style>
   </head>
   <body>
+    <div class="test-banner" style="padding:10px;text-align:center;background:#fff3cd;width:100%;box-sizing:border-box">TEST VERSION — Your live ShelfTalker app is unchanged.</div>
     <!-- Main Interface -->
     <div id="mainInterface" class="main-interface">
       <div class="top-controls">
@@ -705,7 +708,7 @@
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 60000);
         try {
-          const response = await fetch('https://summary-robot.onrender.com/api/summary', {
+          const response = await fetch('https://summary-robot-test.onrender.com/api/summary', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ title, author, description }), signal: controller.signal
           });
