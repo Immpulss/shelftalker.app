@@ -1,0 +1,11 @@
+const {test}=require('node:test'); const assert=require('node:assert/strict');
+const {createLookup,validISBN}=require('./book-lookup.js');
+const isbn='9780316003957';
+const volume=(description, title='The Mysterious Benedict Society')=>({volumeInfo:{title,authors:['Trenton Lee Stewart'],description,industryIdentifiers:[{identifier:isbn}]}});
+function mock(route){return async url=>{const data=route(url);return {ok:true,status:200,json:async()=>data};};}
+test('validates ISBN checksums',()=>{assert.ok(validISBN(isbn));assert.ok(!validISBN('9780316003958'));});
+test('uses a later matching Google record and caches success',async()=>{let n=0;const lookup=createLookup({fetcher:mock(()=>{n++;return {items:[volume(''),volume('Four gifted children face a dangerous mission.')]};})});assert.match((await lookup(isbn)).description,/Four/);await lookup(isbn);assert.equal(n,1);});
+test('follows Open Library work, including object description',async()=>{const lookup=createLookup({fetcher:mock(url=>url.includes('googleapis')?{items:[]}:url.includes('/isbn/')?{title:'The Mysterious Benedict Society',authors:[{key:'/authors/OL1A'}],works:[{key:'/works/OL1W'}]}:url.includes('/authors/')?{name:'Trenton Lee Stewart'}:{description:{value:'Four gifted children face a mission.'}})});assert.equal((await lookup(isbn)).source,'Open Library');});
+test('title fallback rejects a different author',async()=>{const lookup=createLookup({fetcher:mock(url=>url.includes('q=isbn')?{items:[volume('')]}:url.includes('googleapis')?{items:[{volumeInfo:{title:'The Mysterious Benedict Society',authors:['Someone Else'],description:'Wrong plot'}}]}:{} )});assert.equal((await lookup(isbn)).description,'');});
+test('title fallback retrieves matching description',async()=>{const lookup=createLookup({fetcher:mock(url=>url.includes('q=isbn')?{items:[volume('')]}:url.includes('googleapis')?{items:[volume('Correct plot')]}:{})});assert.equal((await lookup(isbn)).description,'Correct plot');});
+test('temporary provider failure retries once and reports unavailable',async()=>{let n=0;const lookup=createLookup({delay:async()=>{},fetcher:async()=>{n++;return {ok:false,status:429}}});const result=await lookup(isbn);assert.equal(result.description,'');assert.equal(n,4);assert.equal(result.warnings.length,2);});
