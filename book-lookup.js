@@ -97,6 +97,12 @@
       if (!book.description && book.title && book.author) {
         const result = await google('intitle:"' + book.title + '" inauthor:"' + book.author + '"');
         for (const item of result?.items || []) { acceptGoogle(item, false); if (book.description) break; }
+        // Google Books field searches sometimes return zero where plain text succeeds.
+        // Keep the same title/author identity checks for these broader results.
+        if (!book.description) {
+          const broad = await google(book.title + ' ' + book.author);
+          for (const item of broad?.items || []) { acceptGoogle(item, false); if (book.description) break; }
+        }
         if (!book.description) {
           const result = await json('https://openlibrary.org/search.json?title=' + encodeURIComponent(book.title) + '&author=' + encodeURIComponent(book.author) + '&limit=5');
           for (const doc of result?.docs || []) {

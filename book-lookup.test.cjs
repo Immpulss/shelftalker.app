@@ -25,3 +25,16 @@ test('work author recovered even when edition already contains description',asyn
  const lookup=createLookup({fetcher:mock(url=>url.includes('googleapis')?{items:[]}:url.includes('/isbn/')?{title:'The Widow',description:'A lawyer takes a case.',works:[{key:'/works/OL44328974W'}]}:url.includes('/works/')?{authors:[{author:{key:'/authors/OL39329A'}}]}:{name:'John Grisham'})});
  const result=await lookup('9780385548984');assert.equal(result.author,'John Grisham');assert.equal(result.description,'A lawyer takes a case.');
 });
+test('plain title/author search recovers description after empty field search',async()=>{
+ const queries=[];
+ const lookup=createLookup({fetcher:mock(url=>{
+  if(url.includes('googleapis')) {
+   const q=new URL(url).searchParams.get('q');queries.push(q);
+   if(q.startsWith('isbn:'))return {items:[volume('')]};
+   if(q.startsWith('intitle:'))return {items:[]};
+   return {items:[{volumeInfo:{title:'Wrong Book',authors:['Trenton Lee Stewart'],description:'Wrong synopsis'}},volume('Verified synopsis')]};
+  }
+  return {};
+ })});
+ const result=await lookup(isbn);assert.equal(result.description,'Verified synopsis');assert.ok(queries.includes('The Mysterious Benedict Society Trenton Lee Stewart'));
+});
