@@ -38,3 +38,21 @@ test('plain title/author search recovers description after empty field search',a
  })});
  const result=await lookup(isbn);assert.equal(result.description,'Verified synopsis');assert.ok(queries.includes('The Mysterious Benedict Society Trenton Lee Stewart'));
 });
+
+test('broad discovery accepts leading article variation but rejects wrong title or author',async()=>{
+ const queries=[];
+ const lookup=createLookup({fetcher:mock(url=>{
+  if(url.includes('/isbn/'))return {title:'Uproar',authors:[{key:'/authors/OL1A'}]};
+  if(url.includes('/authors/'))return {name:'Karim Dimechkie'};
+  if(url.includes('googleapis')){
+   const q=new URL(url).searchParams.get('q');queries.push(q);
+   if(q!=='Dimechkie')return {items:[]};
+   return {items:[
+    {volumeInfo:{title:'The Uproar',authors:['Someone Else'],description:'Wrong author'}},
+    {volumeInfo:{title:'Another Uproar',authors:['Karim Dimechkie'],description:'Wrong title'}},
+    {volumeInfo:{title:'The Uproar',authors:['Karim Dimechkie'],description:'Verified description'}}
+   ]};
+  }return {};
+ })});
+ const result=await lookup('9780316581189');assert.equal(result.description,'Verified description');assert.ok(queries.includes('Uproar'));assert.ok(queries.includes('Dimechkie'));
+});
