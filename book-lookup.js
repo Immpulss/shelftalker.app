@@ -2,6 +2,7 @@
 (function (root) {
   const clean = value => typeof value === 'string' ? value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() : clean(value?.value || '');
   const norm = value => clean(value).normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const titleNorm = value => norm(clean(value).replace(/^(?:the|an|a)\s+/i, ''));
   function validISBN(isbn) {
     if (/^\d{13}$/.test(isbn)) return [...isbn].reduce((n, c, i) => n + Number(c) * (i % 2 ? 3 : 1), 0) % 10 === 0;
     return /^\d{9}[\dX]$/.test(isbn) && [...isbn].reduce((n,c,i) => n + (c === 'X' ? 10 : Number(c)) * (10-i), 0) % 11 === 0;
@@ -34,7 +35,7 @@
       }
       const google = query => json('https://www.googleapis.com/books/v1/volumes?q=' + encodeURIComponent(query) + '&maxResults=10' + (apiKey ? '&key=' + encodeURIComponent(apiKey) : ''));
       let book = { isbn, title: '', author: '', description: '', source: '', warnings };
-      const matches = (title, authors) => norm(title) === norm(book.title) && authors.some(a => norm(a) === norm(book.author) || book.author.split(', ').some(b => norm(a) === norm(b)));
+      const matches = (title, authors) => titleNorm(title) === titleNorm(book.title) && authors.some(a => norm(a) === norm(book.author) || book.author.split(', ').some(b => norm(a) === norm(b)));
       function acceptGoogle(item, exact) {
         const v = item.volumeInfo || {};
         if (!v.title || !v.authors?.length) return;
@@ -102,6 +103,15 @@
         if (!book.description) {
           const broad = await google(book.title + ' ' + book.author);
           for (const item of broad?.items || []) { acceptGoogle(item, false); if (book.description) break; }
+        }
+        // Broader discovery still requires both title and author to match.
+        if (!book.description) {
+          const queries = [...new Set([book.title, book.author.split(/\s+/).pop()])];
+          for (const query of queries) {
+            const result = await google(query);
+            for (const item of result?.items || []) { acceptGoogle(item, false); if (book.description) break; }
+            if (book.description) break;
+          }
         }
         if (!book.description) {
           const result = await json('https://openlibrary.org/search.json?title=' + encodeURIComponent(book.title) + '&author=' + encodeURIComponent(book.author) + '&limit=5');
