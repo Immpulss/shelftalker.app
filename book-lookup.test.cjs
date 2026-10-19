@@ -65,3 +65,22 @@ test('Open Library starts before Google responds',async()=>{
  }});
  const pending=lookup(isbn);assert.equal(editionStarted,true);resolveGoogle();assert.equal((await pending).description,'Verified source');
 });
+
+test('Swifts uses work author and exact ISBN to resolve abbreviated title without choosing sequel',async()=>{
+ const target='9780593533253';const queries=[];
+ const lookup=createLookup({fetcher:mock(url=>{
+  if(url.includes('/isbn/'))return {title:'Swifts',authors:[{key:'/authors/OL1A'},{key:'/authors/OL2A'}],works:[{key:'/works/OL1W'}]};
+  if(url.includes('/authors/OL1A'))return {name:'Beth Lincoln'};
+  if(url.includes('/authors/OL2A'))return {name:'Claire Powell'};
+  if(url.includes('/works/'))return {title:'The Swifts',authors:[{author:{key:'/authors/OL1A'}}]};
+  if(url.includes('googleapis')){
+   const q=new URL(url).searchParams.get('q');queries.push(q);
+   if(q==='Beth Lincoln')return {items:[
+    {volumeInfo:{title:'The Swifts: A Gallery of Rogues',authors:['Beth Lincoln'],description:'Wrong sequel',industryIdentifiers:[{identifier:'9780593533284'}]}},
+    {volumeInfo:{title:'The Swifts: A Dictionary of Scoundrels',authors:['Beth Lincoln'],description:'Correct first book',industryIdentifiers:[{identifier:target}]}}
+   ]};
+   return {items:[]};
+  }return {};
+ })});
+ const b=await lookup(target);assert.equal(b.author,'Beth Lincoln');assert.equal(b.title,'The Swifts: A Dictionary of Scoundrels');assert.equal(b.description,'Correct first book');assert.ok(queries.includes('Beth Lincoln'));
+});

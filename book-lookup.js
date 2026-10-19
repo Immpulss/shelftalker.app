@@ -39,6 +39,9 @@
       function acceptGoogle(item, exact) {
         const v = item.volumeInfo || {};
         if (!v.title || !v.authors?.length) return;
+        // ISBN identity is stronger than abbreviated edition titles or contributor lists.
+        exact = exact || (v.industryIdentifiers || []).some(id => id.identifier === isbn);
+        if (exact) { book.title = v.title; book.author = v.authors.join(', '); }
         if (!exact && !matches(v.title, v.authors)) return;
         if (!book.title) { book.title = v.title; book.author = v.authors.join(', '); }
         if (!matches(v.title, v.authors)) return;
@@ -77,7 +80,8 @@
               if (!/^\/works\/OL\d+W$/.test(work.key || '')) continue;
               const data = await json('https://openlibrary.org' + work.key + '.json');
               if (!data) continue;
-              if (!authors.length) authors = await authorNames(data.authors);
+              const workAuthors = await authorNames(data.authors);
+              if (workAuthors.length) authors = workAuthors;
               works.push(data);
               if (authors.length && (clean(edition.description) || clean(data.description))) break;
             }
@@ -108,10 +112,15 @@
         }
         // Broader discovery still requires both title and author to match.
         if (!book.description) {
-          const queries = [...new Set([book.title, book.author.split(/\s+/).pop()])];
+          const primaryAuthor = book.author.split(', ')[0];
+          const queries = [...new Set([primaryAuthor, book.title + ' ' + primaryAuthor, book.title, primaryAuthor.split(/\s+/).pop()])];
           for (const query of queries) {
             const result = await google(query);
-            for (const item of result?.items || []) { acceptGoogle(item, false); if (book.description) break; }
+            const items = [...(result?.items || [])].sort((a, b) => {
+              const exact = item => (item.volumeInfo?.industryIdentifiers || []).some(id => id.identifier === isbn);
+              return Number(exact(b)) - Number(exact(a));
+            });
+            for (const item of items) { acceptGoogle(item, false); if (book.description) break; }
             if (book.description) break;
           }
         }
