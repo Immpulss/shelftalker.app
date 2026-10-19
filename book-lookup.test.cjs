@@ -84,3 +84,12 @@ test('Swifts uses work author and exact ISBN to resolve abbreviated title withou
  })});
  const b=await lookup(target);assert.equal(b.author,'Beth Lincoln');assert.equal(b.title,'The Swifts: A Dictionary of Scoundrels');assert.equal(b.description,'Correct first book');assert.ok(queries.includes('Beth Lincoln'));
 });
+
+test('manual title and author lookup needs no ISBN and caches separately',async()=>{
+ let calls=0;
+ const lookup=createLookup({fetcher:mock(url=>{calls++;assert.ok(!url.includes('/isbn/'));assert.ok(!new URL(url).searchParams.get('q')?.startsWith('isbn:'));return {items:[volume('Real source description')]};})});
+ const input={title:'The Mysterious Benedict Society',author:'Trenton Lee Stewart'};
+ const b=await lookup(input);assert.equal(b.description,'Real source description');assert.equal(b.isbn,'');
+ const before=calls;await lookup(input);assert.equal(calls,before);
+ await assert.rejects(lookup({title:'Book',author:''}),/both/);
+});

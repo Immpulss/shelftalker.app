@@ -518,6 +518,8 @@
 
         <input type="text" id="title" placeholder="Book Title" required />
         <input type="text" id="author" placeholder="Author Name" required />
+        <button type="button" class="generate-btn" id="findDescriptionButton" onclick="handleTitleAuthor()">🔎 Find Description by Title &amp; Author</button>
+        <p id="bookSource" style="display:none;margin:4px 0" aria-live="polite"></p>
         <button type="button" class="generate-btn" id="generateButton" onclick="generateSummary()">
           🔄 Generate Summary
         </button>
@@ -666,6 +668,62 @@
     .join(" ");
 }
 
+ async function resolveBook(input, sequence) {
+  const book = await lookupBook(input);
+  if (sequence !== lookupSequence || book.description) return book;
+  statusMessage('Trying a web search for the book…');
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 55000);
+  try {
+    const response = await fetch('https://summary-robot-test.onrender.com/api/book-search', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(typeof input === 'string' ? {isbn:input} : input), signal:controller.signal
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Web search could not complete the lookup.');
+    if (sequence !== lookupSequence) return book;
+    if (!data.title || !data.author) throw new Error('No verified book record was found on the web.');
+    if (data.description) return {...book,...data};
+    // A publisher result can identify a book missing from ISBN search indexes.
+    const recovered = await lookupBook({title:data.title,author:data.author});
+    return {...book,...recovered,isbn:book.isbn,sourceURL:data.sourceURL,
+      warnings:[...(book.warnings||[]),...(recovered.warnings||[])],
+      webIdentified:true};
+  } catch (error) {
+    book.warnings = [...(book.warnings||[]), error.name === 'AbortError' ? 'Web search timed out.' : error.message];
+    return book;
+  } finally { clearTimeout(timer); }
+}
+function displayBookSource(book) {
+  const box=document.getElementById('bookSource');
+  box.textContent='';box.style.display=book.description?'block':'none';
+  if(!book.description)return;
+  if(book.sourceURL){
+    const link=document.createElement('a');link.href=book.sourceURL;link.target='_blank';link.rel='noopener noreferrer';
+    link.textContent=book.webIdentified?'Publisher identification source':'Description source';box.appendChild(link);
+    if(book.webIdentified)box.appendChild(document.createTextNode(' · Description: '+book.source));
+  }else box.textContent='Description source: '+book.source;
+}
+async function handleTitleAuthor() {
+  if(isLookingUpISBN)return;
+  const title=document.getElementById('title').value.trim(),author=document.getElementById('author').value.trim();
+  if(!title||!author){statusMessage('Enter both the title and author, then tap Find Description.');return;}
+  const sequence=++lookupSequence;
+  isLookingUpISBN=true;pendingLookupISBN='';lastResolvedISBN='';currentBookDescription='';
+  document.getElementById('sourceDescription').value='';document.getElementById('summary').value='';
+  document.getElementById('bookSource').style.display='none';
+  document.getElementById('generateButton').disabled=true;document.getElementById('findDescriptionButton').disabled=true;
+  statusMessage('Searching for the description by title and author…');
+  try {
+    const book=await resolveBook({title,author},sequence);
+    if(sequence!==lookupSequence || title!==document.getElementById('title').value.trim() || author!==document.getElementById('author').value.trim())return;
+    currentBookDescription=book.description;document.getElementById('sourceDescription').value=book.description;
+    displayBookSource(book);
+    statusMessage(book.description?'Description found. Tap Generate Summary.':book.warnings?.at(-1)||'No matching description was found. Check the title and author and try again.');
+  }catch(error){if(sequence===lookupSequence)statusMessage(error.message);}
+  finally{if(sequence===lookupSequence){isLookingUpISBN=false;document.getElementById('generateButton').disabled=false;document.getElementById('findDescriptionButton').disabled=false;}}
+}
+
  async function handleISBN() {
   const isbn = document.getElementById('isbn').value.replace(/[^0-9Xx]/g, '').toUpperCase();
   if (isLookingUpISBN && isbn === pendingLookupISBN) return;
@@ -684,18 +742,20 @@
     document.getElementById('title').value = '';
     document.getElementById('author').value = '';
   }
+  document.getElementById('bookSource').style.display='none';
   statusMessage('Looking up the book and its description…');
   try {
-    const book = await lookupBook(isbn);
+    const book = await resolveBook(isbn, sequence);
     if (sequence !== lookupSequence) return;
     document.getElementById('title').value = book.title || previous?.title || '';
     document.getElementById('author').value = book.author || previous?.author || '';
     currentBookDescription = book.description;
     document.getElementById('sourceDescription').value = book.description;
     lastResolvedISBN = isbn;
+    displayBookSource(book);
     statusMessage(book.description ? 'Description found: ' + book.source :
-      book.warnings.length ? 'A book service could not complete the lookup. Try again, or paste a description below.' :
-      book.title ? 'Book found, but no description is available. Paste a publisher description below.' : 'Book not found. Check the ISBN or enter the details and a description below.');
+      book.warnings.length ? 'Automatic lookup could not finish. You can enter the title and author, then tap Find Description.' :
+      book.title ? 'No description found yet. Check the title and author, then tap Find Description.' : 'Book not found. Enter the title and author, then tap Find Description.');
   } catch (error) { if (sequence === lookupSequence) statusMessage(error.message); }
   finally { if (sequence === lookupSequence) { isLookingUpISBN = false; document.getElementById('generateButton').disabled = false; } }
 }
@@ -706,7 +766,7 @@
         const author = document.getElementById('author').value.trim();
         const description = document.getElementById('sourceDescription').value.trim();
         if (!title || !author) { statusMessage('Enter the title and author first.'); return; }
-        if (!description) { statusMessage('Paste a publisher description below before generating.'); document.getElementById('sourceDetails').open = true; return; }
+        if (!description) { await handleTitleAuthor(); return; }
         const sequence = lookupSequence;
         const button = document.getElementById('generateButton');
         button.disabled = true;
@@ -912,6 +972,8 @@
       }
 
       document.getElementById('isbn').addEventListener('input', () => {
+        document.getElementById('findDescriptionButton').disabled=false;
+        document.getElementById('bookSource').style.display='none';
         ++lookupSequence;
         currentBookDescription = '';
         lastResolvedISBN = '';
@@ -919,6 +981,12 @@
         document.getElementById('generateButton').disabled = false;
         document.getElementById('sourceDescription').value = '';
         document.getElementById('summary').value = '';
+      });
+      for (const id of ['title','author']) document.getElementById(id).addEventListener('input', () => {
+        ++lookupSequence; currentBookDescription=''; lastResolvedISBN=''; isLookingUpISBN=false;
+        document.getElementById('sourceDescription').value='';document.getElementById('summary').value='';
+        document.getElementById('bookSource').style.display='none';
+        document.getElementById('generateButton').disabled=false;document.getElementById('findDescriptionButton').disabled=false;
       });
       // Initialize
       updateCardCounter();

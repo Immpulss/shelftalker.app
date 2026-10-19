@@ -18,3 +18,15 @@ test('failed retry retains metadata already found for the same ISBN',async()=>{
  assert.equal(a.el('title').value,'Book');assert.equal(a.el('author').value,'Author');
  a.el('isbn').value='9780385548984';await a.run('handleISBN()');assert.equal(a.el('title').value,'');
 });
+
+test('manual title author search fills actual description without requiring ISBN',async()=>{
+ let input;const a=app(async query=>{input=query;return book});
+ a.el('title').value='Book';a.el('author').value='Author';await a.run('handleTitleAuthor()');
+ assert.equal(input.title,'Book');assert.equal(input.author,'Author');assert.equal(a.el('sourceDescription').value,book.description);
+});
+test('web fallback metadata is searched in databases instead of inventing synopsis',async()=>{
+ const inputs=[];const a=app(async input=>{inputs.push(input);return typeof input==='string'?{title:'',author:'',description:'',warnings:[]}:book});
+ a.context.fetch=async()=>({ok:true,json:async()=>({title:'Book',author:'Author',description:''})});
+ a.el('isbn').value='9781665932578';await a.run('handleISBN()');
+ assert.equal(inputs.length,2);assert.equal(inputs[1].title,'Book');assert.equal(a.el('sourceDescription').value,book.description);
+});

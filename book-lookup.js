@@ -10,9 +10,14 @@
   function createLookup({ fetcher = fetch, apiKey = '', timeout = 8000, delay = ms => new Promise(r => setTimeout(r, ms)) } = {}) {
     const cache = new Map();
     return async function lookup(raw) {
-      const isbn = raw.replace(/[^0-9Xx]/g, '').toUpperCase();
-      if (!validISBN(isbn)) throw new Error('Please enter a valid 10- or 13-digit ISBN.');
-      if (cache.has(isbn)) return { ...cache.get(isbn), warnings: [] };
+      const manual = typeof raw === 'object' && raw !== null;
+      const isbn = manual ? '' : raw.replace(/[^0-9Xx]/g, '').toUpperCase();
+      const initialTitle = manual ? clean(raw.title) : '';
+      const initialAuthor = manual ? clean(raw.author) : '';
+      if (manual && (!initialTitle || !initialAuthor)) throw new Error('Enter both the title and author to search.');
+      if (!manual && !validISBN(isbn)) throw new Error('Please enter a valid 10- or 13-digit ISBN.');
+      const cacheKey = manual ? 'manual:' + norm(initialTitle) + ':' + norm(initialAuthor) : isbn;
+      if (cache.has(cacheKey)) return { ...cache.get(cacheKey), warnings: [] };
       const warnings = [];
       async function json(url) {
         for (let attempt=0; attempt<2; attempt++) {
@@ -34,7 +39,7 @@
         }
       }
       const google = query => json('https://www.googleapis.com/books/v1/volumes?q=' + encodeURIComponent(query) + '&maxResults=10' + (apiKey ? '&key=' + encodeURIComponent(apiKey) : ''));
-      let book = { isbn, title: '', author: '', description: '', source: '', warnings };
+      let book = { isbn, title: initialTitle, author: initialAuthor, description: '', source: '', warnings };
       const matches = (title, authors) => titleNorm(title) === titleNorm(book.title) && authors.some(a => norm(a) === norm(book.author) || book.author.split(', ').some(b => norm(a) === norm(b)));
       function acceptGoogle(item, exact) {
         const v = item.volumeInfo || {};
@@ -48,8 +53,8 @@
         if (clean(v.description)) { book.description = clean(v.description); book.source = 'Google Books'; }
       }
       // Start independent providers together; a slow Google search must not delay Open Library.
-      const editionRequest = json('https://openlibrary.org/isbn/' + isbn + '.json');
-      const g = await google('isbn:' + isbn);
+      const editionRequest = manual ? Promise.resolve(null) : json('https://openlibrary.org/isbn/' + isbn + '.json');
+      const g = manual ? null : await google('isbn:' + isbn);
       for (const item of g?.items || []) {
         const ids = item.volumeInfo?.industryIdentifiers || [];
         if (ids.some(i => i.identifier === isbn)) acceptGoogle(item, true);
@@ -133,7 +138,7 @@
           }
         }
       }
-      if (book.description && book.title && book.author) cache.set(isbn, { ...book });
+      if (book.description && book.title && book.author) cache.set(cacheKey, { ...book });
       return book;
     };
   }
