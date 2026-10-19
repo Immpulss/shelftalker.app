@@ -3,6 +3,16 @@
   const clean = value => typeof value === 'string' ? value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() : clean(value?.value || '');
   const norm = value => clean(value).normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
   const titleNorm = value => norm(clean(value).replace(/^(?:the|an|a)\s+/i, ''));
+  function sameAuthor(left, right) {
+    if (typeof left !== 'string' || typeof right !== 'string' || !left.trim() || !right.trim()) return false;
+    const parts = value => value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').trim().split(/\s+/);
+    const a = parts(left), b = parts(right);
+    if (a.join(' ') === b.join(' ')) return true;
+    if (a.length < 2 || b.length < 2 || a[0] !== b[0] || a.at(-1) !== b.at(-1)) return false;
+    const am = a.slice(1, -1), bm = b.slice(1, -1);
+    if (!am.length || !bm.length) return true;
+    return am.length === bm.length && am.every((name, i) => name === bm[i] || (name.length === 1 && bm[i].startsWith(name)) || (bm[i].length === 1 && name.startsWith(bm[i])));
+  }
   function validISBN(isbn) {
     if (/^\d{13}$/.test(isbn)) return [...isbn].reduce((n, c, i) => n + Number(c) * (i % 2 ? 3 : 1), 0) % 10 === 0;
     return /^\d{9}[\dX]$/.test(isbn) && [...isbn].reduce((n,c,i) => n + (c === 'X' ? 10 : Number(c)) * (10-i), 0) % 11 === 0;
@@ -40,7 +50,7 @@
       }
       const google = query => json('https://www.googleapis.com/books/v1/volumes?q=' + encodeURIComponent(query) + '&maxResults=10' + (apiKey ? '&key=' + encodeURIComponent(apiKey) : ''));
       let book = { isbn, title: initialTitle, author: initialAuthor, description: '', source: '', warnings };
-      const matches = (title, authors) => titleNorm(title) === titleNorm(book.title) && authors.some(a => norm(a) === norm(book.author) || book.author.split(', ').some(b => norm(a) === norm(b)));
+      const matches = (title, authors) => titleNorm(title) === titleNorm(book.title) && authors.some(a => sameAuthor(a, book.author) || book.author.split(', ').some(b => sameAuthor(a, b)));
       function acceptGoogle(item, exact) {
         const v = item.volumeInfo || {};
         if (!v.title || !v.authors?.length) return;
@@ -142,7 +152,7 @@
       return book;
     };
   }
-  const api = { createLookup, validISBN, clean };
+  const api = { createLookup, validISBN, clean, sameAuthor };
   if (typeof module !== 'undefined') module.exports = api;
   else root.BookLookup = api;
 })(globalThis);

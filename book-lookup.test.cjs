@@ -93,3 +93,14 @@ test('manual title and author lookup needs no ISBN and caches separately',async(
  const before=calls;await lookup(input);assert.equal(calls,before);
  await assert.rejects(lookup({title:'Book',author:''}),/both/);
 });
+
+test('author name variants allow missing middle initial while rejecting a different author or title',async()=>{
+ const {sameAuthor}=require('./book-lookup.js');
+ for(const [a,b,expected] of [['Jennifer Nielsen','Jennifer A. Nielsen',true],['Jennifer A Nielsen','Jennifer Anne Nielsen',true],['Jennifer A Nielsen','Jennifer B Nielsen',false],['Jennifer Nielsen','John Nielsen',false],['Jennifer Nielsen','Jennifer Smith',false]])assert.equal(sameAuthor(a,b),expected);
+ const lookup=createLookup({fetcher:mock(()=>({items:[
+  {volumeInfo:{title:'Words on Fire',authors:['Jennifer B. Smith'],description:'Wrong author'}},
+  {volumeInfo:{title:'Iceberg',authors:['Jennifer A. Nielsen'],description:'Wrong title'}},
+  {volumeInfo:{title:'Words on Fire',authors:['Jennifer A. Nielsen'],description:'Verified source description'}}
+ ]}))});
+ const b=await lookup({title:'Words on fire',author:'Jennifer Nielsen'});assert.equal(b.description,'Verified source description');
+});
