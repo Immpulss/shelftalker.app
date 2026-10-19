@@ -44,6 +44,8 @@
         if (!matches(v.title, v.authors)) return;
         if (clean(v.description)) { book.description = clean(v.description); book.source = 'Google Books'; }
       }
+      // Start independent providers together; a slow Google search must not delay Open Library.
+      const editionRequest = json('https://openlibrary.org/isbn/' + isbn + '.json');
       const g = await google('isbn:' + isbn);
       for (const item of g?.items || []) {
         const ids = item.volumeInfo?.industryIdentifiers || [];
@@ -51,7 +53,7 @@
         if (book.description) break;
       }
       if (!book.description) {
-        const edition = await json('https://openlibrary.org/isbn/' + isbn + '.json');
+        const edition = await editionRequest;
         if (edition) {
           // Editions can omit authors entirely; their linked works contain them.
           const authorCache = new Map();

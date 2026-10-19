@@ -561,6 +561,7 @@
       let isLookingUpISBN = false;
       let lookupSequence = 0;
       let lastResolvedISBN = "";
+      let pendingLookupISBN = "";
       const lookupBook = BookLookup.createLookup({ apiKey: "AIzaSyAQ4Ex0kn0SjjWI_YkRMFbBxPiQYH8r_bU" });
       function statusMessage(message) {
         const box = document.getElementById('isbnError');
@@ -667,7 +668,9 @@
 
  async function handleISBN() {
   const isbn = document.getElementById('isbn').value.replace(/[^0-9Xx]/g, '').toUpperCase();
+  if (isLookingUpISBN && isbn === pendingLookupISBN) return;
   if (isbn === lastResolvedISBN && currentBookDescription) return;
+  const previous = isbn === lastResolvedISBN ? { title: document.getElementById('title').value, author: document.getElementById('author').value } : null;
   const sequence = ++lookupSequence;
   currentBookDescription = '';
   lastResolvedISBN = '';
@@ -675,15 +678,18 @@
   document.getElementById('summary').value = '';
   if (!isbn) { isLookingUpISBN = false; document.getElementById('generateButton').disabled = false; statusMessage(''); return; }
   isLookingUpISBN = true;
+  pendingLookupISBN = isbn;
   document.getElementById('generateButton').disabled = true;
-  document.getElementById('title').value = '';
-  document.getElementById('author').value = '';
+  if (!previous) {
+    document.getElementById('title').value = '';
+    document.getElementById('author').value = '';
+  }
   statusMessage('Looking up the book and its description…');
   try {
     const book = await lookupBook(isbn);
     if (sequence !== lookupSequence) return;
-    document.getElementById('title').value = book.title;
-    document.getElementById('author').value = book.author;
+    document.getElementById('title').value = book.title || previous?.title || '';
+    document.getElementById('author').value = book.author || previous?.author || '';
     currentBookDescription = book.description;
     document.getElementById('sourceDescription').value = book.description;
     lastResolvedISBN = isbn;

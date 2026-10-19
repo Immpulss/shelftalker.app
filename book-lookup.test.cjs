@@ -4,7 +4,7 @@ const isbn='9780316003957';
 const volume=(description, title='The Mysterious Benedict Society')=>({volumeInfo:{title,authors:['Trenton Lee Stewart'],description,industryIdentifiers:[{identifier:isbn}]}});
 function mock(route){return async url=>{const data=route(url);return {ok:true,status:200,json:async()=>data};};}
 test('validates ISBN checksums',()=>{assert.ok(validISBN(isbn));assert.ok(!validISBN('9780316003958'));});
-test('uses a later matching Google record and caches success',async()=>{let n=0;const lookup=createLookup({fetcher:mock(()=>{n++;return {items:[volume(''),volume('Four gifted children face a dangerous mission.')]};})});assert.match((await lookup(isbn)).description,/Four/);await lookup(isbn);assert.equal(n,1);});
+test('uses a later matching Google record and caches success',async()=>{let n=0;const lookup=createLookup({fetcher:mock(()=>{n++;return {items:[volume(''),volume('Four gifted children face a dangerous mission.')]};})});assert.match((await lookup(isbn)).description,/Four/);const callsAfterSuccess=n;await lookup(isbn);assert.equal(n,callsAfterSuccess);});
 test('follows Open Library work, including object description',async()=>{const lookup=createLookup({fetcher:mock(url=>url.includes('googleapis')?{items:[]}:url.includes('/isbn/')?{title:'The Mysterious Benedict Society',authors:[{key:'/authors/OL1A'}],works:[{key:'/works/OL1W'}]}:url.includes('/authors/')?{name:'Trenton Lee Stewart'}:{description:{value:'Four gifted children face a mission.'}})});assert.equal((await lookup(isbn)).source,'Open Library');});
 test('title fallback rejects a different author',async()=>{const lookup=createLookup({fetcher:mock(url=>url.includes('q=isbn')?{items:[volume('')]}:url.includes('googleapis')?{items:[{volumeInfo:{title:'The Mysterious Benedict Society',authors:['Someone Else'],description:'Wrong plot'}}]}:{} )});assert.equal((await lookup(isbn)).description,'');});
 test('title fallback retrieves matching description',async()=>{const lookup=createLookup({fetcher:mock(url=>url.includes('q=isbn')?{items:[volume('')]}:url.includes('googleapis')?{items:[volume('Correct plot')]}:{})});assert.equal((await lookup(isbn)).description,'Correct plot');});
@@ -55,4 +55,13 @@ test('broad discovery accepts leading article variation but rejects wrong title 
   }return {};
  })});
  const result=await lookup('9780316581189');assert.equal(result.description,'Verified description');assert.ok(queries.includes('Uproar'));assert.ok(queries.includes('Dimechkie'));
+});
+
+test('Open Library starts before Google responds',async()=>{
+ let resolveGoogle,editionStarted=false;
+ const lookup=createLookup({fetcher:async url=>{
+  if(url.includes('googleapis'))return new Promise(r=>resolveGoogle=()=>r({ok:true,status:200,json:async()=>({items:[volume('Verified source')]})}));
+  editionStarted=true;return {ok:true,status:200,json:async()=>({})};
+ }});
+ const pending=lookup(isbn);assert.equal(editionStarted,true);resolveGoogle();assert.equal((await pending).description,'Verified source');
 });
