@@ -518,7 +518,6 @@
 
         <input type="text" id="title" placeholder="Book Title" required />
         <input type="text" id="author" placeholder="Author Name" required />
-        <button type="button" class="generate-btn" id="findDescriptionButton" onclick="handleTitleAuthor()">🔎 Find Description by Title &amp; Author</button>
         <p id="bookSource" style="display:none;margin:4px 0" aria-live="polite"></p>
         <button type="button" class="generate-btn" id="generateButton" onclick="generateSummary()">
           🔄 Generate Summary
@@ -694,7 +693,7 @@ function resetDescriptionPhoto(hide = true) {
   document.getElementById('descriptionPhotoStatus').textContent = '';
   document.getElementById('descriptionPhotoButton').disabled = false;
   document.getElementById('generateButton').disabled = isLookingUpISBN;
-  document.getElementById('findDescriptionButton').disabled = isLookingUpISBN;
+  
   if (hide) offerDescriptionPhoto(false);
 }
 function chooseDescriptionPhoto() {
@@ -744,7 +743,7 @@ async function readDescriptionPhoto(file) {
   ocrBusy = true;
   document.getElementById('descriptionPhotoButton').disabled = true;
   document.getElementById('generateButton').disabled = true;
-  document.getElementById('findDescriptionButton').disabled = true;
+  
   message.textContent = 'Loading the photo reader… The first use needs a download.';
   try {
     const library = await loadOCRLibrary();
@@ -783,7 +782,7 @@ async function readDescriptionPhoto(file) {
       ocrBusy = false;
       document.getElementById('descriptionPhotoButton').disabled = false;
       document.getElementById('generateButton').disabled = isLookingUpISBN;
-      document.getElementById('findDescriptionButton').disabled = isLookingUpISBN;
+      
       document.getElementById('descriptionPhotoInput').value = '';
     }
   }
@@ -806,13 +805,13 @@ function displayBookSource(book) {
 async function handleTitleAuthor() {
   if(isLookingUpISBN)return;
   const title=document.getElementById('title').value.trim(),author=document.getElementById('author').value.trim();
-  if(!title||!author){statusMessage('Enter both the title and author, then tap Find Description.');return;}
+  if(!title||!author){statusMessage('Enter both the title and author, then tap Generate Summary.');return;}
   const sequence=++lookupSequence;
   resetDescriptionPhoto();
   isLookingUpISBN=true;pendingLookupISBN='';lastResolvedISBN='';currentBookDescription='';
   document.getElementById('sourceDescription').value='';document.getElementById('summary').value='';
   document.getElementById('bookSource').style.display='none';
-  document.getElementById('generateButton').disabled=true;document.getElementById('findDescriptionButton').disabled=true;
+  document.getElementById('generateButton').disabled=true;
   statusMessage('Searching for the description by title and author…');
   try {
     const book=await resolveBook({title,author},sequence);
@@ -822,7 +821,7 @@ async function handleTitleAuthor() {
     offerDescriptionPhoto(!book.description);
     statusMessage(book.description?'Description found. Tap Generate Summary.':book.warnings?.at(-1)||'No matching description was found. Check the title and author and try again.');
   }catch(error){if(sequence===lookupSequence)statusMessage(error.message);}
-  finally{if(sequence===lookupSequence){isLookingUpISBN=false;document.getElementById('generateButton').disabled=false;document.getElementById('findDescriptionButton').disabled=false;}}
+  finally{if(sequence===lookupSequence){isLookingUpISBN=false;document.getElementById('generateButton').disabled=false;}}
 }
 
  async function handleISBN() {
@@ -857,8 +856,8 @@ async function handleTitleAuthor() {
     displayBookSource(book);
     offerDescriptionPhoto(!book.description);
     statusMessage(book.description ? 'Description found: ' + book.source :
-      book.warnings.length ? 'Automatic lookup could not finish. You can enter the title and author, then tap Find Description.' :
-      book.title ? 'No description found yet. Check the title and author, then tap Find Description.' : 'Book not found. Enter the title and author, then tap Find Description.');
+      book.warnings.length ? 'Automatic lookup could not finish. Check the title and author, then photograph the book description below.' :
+      book.title ? 'No description found. You can photograph the book description below.' : 'Book not found. Enter the title and author, then photograph the book description below.');
   } catch (error) { if (sequence === lookupSequence) statusMessage(error.message); }
   finally { if (sequence === lookupSequence) { isLookingUpISBN = false; document.getElementById('generateButton').disabled = false; } }
 }
@@ -1078,7 +1077,7 @@ async function handleTitleAuthor() {
 
       document.getElementById('isbn').addEventListener('input', () => {
         resetDescriptionPhoto();
-        document.getElementById('findDescriptionButton').disabled=false;
+        
         document.getElementById('bookSource').style.display='none';
         ++lookupSequence;
         currentBookDescription = '';
@@ -1093,7 +1092,7 @@ async function handleTitleAuthor() {
         ++lookupSequence; currentBookDescription=''; lastResolvedISBN=''; isLookingUpISBN=false;
         document.getElementById('sourceDescription').value='';document.getElementById('summary').value='';
         document.getElementById('bookSource').style.display='none';
-        document.getElementById('generateButton').disabled=false;document.getElementById('findDescriptionButton').disabled=false;
+        document.getElementById('generateButton').disabled=false;
       });
       document.getElementById('sourceDescription').addEventListener('input', () => {
         ++lookupSequence; resetDescriptionPhoto();
