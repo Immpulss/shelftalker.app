@@ -1,6 +1,17 @@
 const {test}=require('node:test'); const assert=require('node:assert/strict'); const fs=require('node:fs'); const vm=require('node:vm');
 const html=fs.readFileSync(__dirname+'/index.html','utf8'); const script=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)][0][1];
-function app(lookup){const els=new Map(); const el=id=>{if(!els.has(id))els.set(id,{value:'',style:{},textContent:'',disabled:false,innerHTML:'',addEventListener(){},scrollIntoView(){}});return els.get(id);};const context=vm.createContext({document:{getElementById:el,querySelector:()=>el('button')},BookLookup:{createLookup:()=>lookup},console,setTimeout,clearTimeout,AbortController,fetch:async()=>({ok:true,json:async()=>({summary:'A concise summary.'})})});vm.runInContext(script,context);return {el,run:s=>vm.runInContext(s,context),context};}
+function memoryStorage(){const data=new Map();return {getItem:key=>data.has(key)?data.get(key):null,setItem:(key,value)=>data.set(key,value)};}
+function app(lookup, storage=memoryStorage()) {
+ const els=new Map();
+ const node=()=>({value:'',style:{},textContent:'',disabled:false,innerHTML:'',scrollHeight:0,offsetHeight:100,
+  addEventListener(){},scrollIntoView(){},appendChild(){},querySelector(){return node()},closest(){return node()}});
+ const el=id=>{if(!els.has(id))els.set(id,node());return els.get(id);};
+ const context=vm.createContext({localStorage:storage,confirm:()=>true,
+  document:{getElementById:el,querySelector:()=>el('button'),createElement:()=>node()},
+  BookLookup:{createLookup:()=>lookup},console,setTimeout,clearTimeout,AbortController,
+  fetch:async()=>({ok:true,json:async()=>({summary:'A concise summary.'})})});
+ vm.runInContext(script,context);return {el,run:s=>vm.runInContext(s,context),context,storage};
+}
 const book={title:'Book',author:'Author',description:'A real source description.',source:'Test',warnings:[]};
 test('repeated blur does not erase description or repeat successful lookup',async()=>{let n=0;const a=app(async()=>{n++;return book});a.el('isbn').value='9780316003957';await a.run('handleISBN()');await a.run('handleISBN()');assert.equal(n,1);assert.equal(a.el('sourceDescription').value,book.description);});
 test('older lookup cannot overwrite a newer scanned book',async()=>{let resolve;const a=app(isbn=>isbn==='9780316003957'?new Promise(r=>resolve=r):Promise.resolve({...book,title:'New book'}));a.el('isbn').value='9780316003957';const old=a.run('handleISBN()');a.el('isbn').value='9780385548984';await a.run('handleISBN()');resolve(book);await old;assert.equal(a.el('title').value,'New book');});
@@ -66,4 +77,41 @@ test('unreadable photo keeps fallback available and does not create a descriptio
  a.run('prepareDescriptionImage=async()=>({})');
  a.el('isbn').value='9781665932578';await a.run('handleISBN()');await a.run("readDescriptionPhoto({type:'image/jpeg',size:1000})");
  assert.equal(a.el('sourceDescription').value,'');assert.equal(a.run('photoEligible'),true);assert.match(a.el('descriptionPhotoStatus').textContent,/Not enough text/);assert.equal(a.run('ocrBusy'),false);
+});
+
+function queueCard(a,title='Book'){a.el('title').value=title;a.el('author').value='Author';a.el('summary').value='A concise summary.';a.run('addCard({preventDefault(){}})');}
+test('queue survives a new page instance and preserves all card fields',()=>{
+ const a=app(async()=>book);queueCard(a);queueCard(a,'Second book');
+ const b=app(async()=>book,a.storage);assert.equal(b.run('cardQueue.length'),2);
+ assert.equal(b.run('cardQueue[0].summary'),'A concise summary.');assert.equal(b.el('cardCount').textContent,2);
+ assert.match(b.el('queueStorageStatus').textContent,/Restored 2/);
+});
+test('delete and confirmed clear persist, while cancelled clear keeps saved cards',()=>{
+ const a=app(async()=>book);queueCard(a);queueCard(a,'Second book');a.run('deleteCard(0)');
+ assert.equal(app(async()=>book,a.storage).run('cardQueue[0].title'),'Second Book');
+ a.context.confirm=()=>false;a.run('clearCards()');assert.equal(app(async()=>book,a.storage).run('cardQueue.length'),1);
+ a.context.confirm=()=>true;a.run('clearCards()');assert.equal(app(async()=>book,a.storage).run('cardQueue.length'),0);
+});
+test('refresh during editing retains original, saving edit replaces instead of duplicating',()=>{
+ const a=app(async()=>book);queueCard(a);a.run('editCard(0)');
+ assert.equal(a.run('cardQueue.length'),1);assert.equal(app(async()=>book,a.storage).run('cardQueue[0].title'),'Book');
+ a.el('summary').value='An edited summary.';a.run('addCard({preventDefault(){}})');
+ const b=app(async()=>book,a.storage);assert.equal(b.run('cardQueue.length'),1);assert.equal(b.run('cardQueue[0].summary'),'An edited summary.');
+});
+test('scanning another ISBN cancels editing and preserves original card',async()=>{
+ const a=app(async()=>({...book,title:'Next book'}));queueCard(a);a.run('editCard(0)');
+ a.el('isbn').value='9780316003957';await a.run('handleISBN()');a.el('summary').value='New summary.';a.run('addCard({preventDefault(){}})');
+ assert.equal(app(async()=>book,a.storage).run('cardQueue.length'),2);
+});
+test('storage failures warn clearly without preventing queue use',()=>{
+ const a=app(async()=>book,{getItem(){throw Error('Denied')},setItem(){throw Error('Full')}});
+ assert.match(a.el('queueStorageStatus').textContent,/could not be loaded/);queueCard(a);
+ assert.equal(a.run('cardQueue.length'),1);assert.match(a.el('queueStorageStatus').textContent,/could not be saved/);
+});
+test('damaged or invalid saved cards do not crash startup or overwrite saved raw data',()=>{
+ for(const raw of ['{broken',JSON.stringify({version:1,cards:[{title:'Book',author:'Author',summary:'x'.repeat(261)}]})]){
+  const storage=memoryStorage();storage.setItem('ShelfTalker.printQueue.v1',raw);const a=app(async()=>book,storage);
+  assert.equal(a.run('cardQueue.length'),0);assert.match(a.el('queueStorageStatus').textContent,/could not be loaded/);
+  assert.equal(storage.getItem('ShelfTalker.printQueue.v1'),raw);
+ }
 });

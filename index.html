@@ -496,6 +496,8 @@
         <div class="counter-number" id="cardCount">0</div>
       </div>
 
+      <p id="queueStorageStatus" role="status" aria-live="polite" style="text-align:center;font:14px Arial,sans-serif;margin:8px 0 16px;color:#555"></p>
+
       <div class="scan-wrapper">
         <button onclick="openScanner()">📷 Scan Barcode</button>
       </div>
@@ -564,6 +566,40 @@
     <script src="book-lookup.js?v=20261019-author-matching"></script>
     <script>
       const cardQueue = [];
+      const QUEUE_STORAGE_KEY = 'ShelfTalker.printQueue.v1';
+      let editingCardIndex = null;
+      function queueStorageMessage(message, failed = false) {
+        const status = document.getElementById('queueStorageStatus');
+        status.textContent = message;
+        status.style.color = failed ? '#b42318' : '#555';
+      }
+      function saveQueue() {
+        try {
+          localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify({ version: 1, cards: cardQueue }));
+          queueStorageMessage('Queue saved on this device.');
+        } catch (error) {
+          queueStorageMessage('Queue could not be saved. Keep this page open and print before closing it.', true);
+        }
+      }
+      function restoreQueue() {
+        try {
+          const raw = localStorage.getItem(QUEUE_STORAGE_KEY);
+          if (raw === null) { queueStorageMessage('Queue saves automatically in this browser on this device.'); return; }
+          const saved = JSON.parse(raw);
+          if (saved.version !== 1 || !Array.isArray(saved.cards) || !saved.cards.every(card =>
+            card && ['title','author','summary'].every(key => typeof card[key] === 'string' && card[key].trim()) && card.summary.length <= 260)) {
+            throw new Error('Invalid saved queue');
+          }
+          for (const {title, author, summary} of saved.cards) cardQueue.push({title, author, summary});
+          queueStorageMessage(cardQueue.length ? `Restored ${cardQueue.length} saved card${cardQueue.length === 1 ? '' : 's'} on this device.` : 'Queue saved on this device.');
+        } catch (error) {
+          queueStorageMessage('Saved queue could not be loaded. Browser storage may be unavailable or damaged.', true);
+        }
+      }
+      function resetCardEditing() {
+        editingCardIndex = null;
+        document.querySelector('.add-btn').textContent = '➕ Add to Print Queue';
+      }
       let currentBookDescription = "";
       let scanner;
       let isLookingUpISBN = false;
@@ -825,6 +861,7 @@ async function handleTitleAuthor() {
 }
 
  async function handleISBN() {
+  resetCardEditing();
   const isbn = document.getElementById('isbn').value.replace(/[^0-9Xx]/g, '').toUpperCase();
   if (isLookingUpISBN && isbn === pendingLookupISBN) return;
   if (isbn === lastResolvedISBN && currentBookDescription) return;
@@ -986,6 +1023,8 @@ async function handleTitleAuthor() {
         
         if (confirmed) {
           cardQueue.length = 0;
+          resetCardEditing();
+          saveQueue();
           updateCardCounter();
           renderCards();
         }
@@ -1008,7 +1047,11 @@ async function handleTitleAuthor() {
         if (title && author && summary) {
           title = toTitleCase(title);
           author = toTitleCase(author);
-          cardQueue.push({ title, author, summary });
+          const wasEditing = editingCardIndex !== null;
+          if (wasEditing) cardQueue[editingCardIndex] = { title, author, summary };
+          else cardQueue.push({ title, author, summary });
+          resetCardEditing();
+          saveQueue();
           document.getElementById("title").value = "";
           document.getElementById("author").value = "";
           document.getElementById("summary").value = "";
@@ -1022,11 +1065,10 @@ async function handleTitleAuthor() {
           
           // Show success feedback
           const addBtn = document.querySelector('.add-btn');
-          const originalText = addBtn.textContent;
-          addBtn.textContent = '✅ Added!';
+          addBtn.textContent = wasEditing ? '✅ Changes saved!' : '✅ Added!';
           addBtn.style.backgroundColor = '#4caf50';
           setTimeout(() => {
-            addBtn.textContent = originalText;
+            addBtn.textContent = editingCardIndex === null ? '➕ Add to Print Queue' : '💾 Save Changes';
             addBtn.style.backgroundColor = '#e57373';
           }, 1000);
         }
@@ -1034,6 +1076,9 @@ async function handleTitleAuthor() {
 
       function editCard(index) {
         const card = cardQueue[index];
+        if (!card) return;
+        editingCardIndex = index;
+        document.querySelector('.add-btn').textContent = '💾 Save Changes';
         ++lookupSequence;
         resetDescriptionPhoto();
         currentBookDescription = '';
@@ -1042,12 +1087,9 @@ async function handleTitleAuthor() {
         document.getElementById('generateButton').disabled = false;
         document.getElementById('isbn').value = '';
         document.getElementById('sourceDescription').value = '';
-        statusMessage('Editing a queued card. Paste a description if you want to regenerate it.');
+        statusMessage('Editing a queued card. The original stays saved until you press Save Changes.');
         
-        // Remove from queue first
-        cardQueue.splice(index, 1);
-        updateCardCounter();
-        renderCards();
+        // Keep the saved original until the edited card is submitted.
         
         // Switch to main interface and populate form
         showMainInterface();
@@ -1062,7 +1104,10 @@ async function handleTitleAuthor() {
       }
 
       function deleteCard(index) {
+        if (editingCardIndex === index) resetCardEditing();
+        else if (editingCardIndex !== null && index < editingCardIndex) editingCardIndex--;
         cardQueue.splice(index, 1);
+        saveQueue();
         updateCardCounter();
         renderCards();
       }
@@ -1076,6 +1121,7 @@ async function handleTitleAuthor() {
       }
 
       document.getElementById('isbn').addEventListener('input', () => {
+        resetCardEditing();
         resetDescriptionPhoto();
         
         document.getElementById('bookSource').style.display='none';
@@ -1100,6 +1146,7 @@ async function handleTitleAuthor() {
         document.getElementById('summary').value = '';
       });
       // Initialize
+      restoreQueue();
       updateCardCounter();
       renderCards();
     </script>
