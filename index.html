@@ -523,6 +523,13 @@
         <button type="button" class="generate-btn" id="generateButton" onclick="generateSummary()">
           🔄 Generate Summary
         </button>
+        <section id="descriptionPhotoFallback" hidden style="width:100%;box-sizing:border-box;padding:12px;border:1px solid #ccc;border-radius:10px">
+          <p style="margin:0 0 8px">No description found? Photograph the back-cover blurb or inside flap.</p>
+          <button type="button" class="generate-btn" id="descriptionPhotoButton" onclick="chooseDescriptionPhoto()">📷 Photograph Book Description</button>
+          <input id="descriptionPhotoInput" type="file" accept="image/*" capture="environment" hidden onchange="readDescriptionPhoto(this.files[0])" />
+          <p style="font-size:14px;margin:8px 0">Photo text is read on your device. Take a close, clear photo of just the description.</p>
+          <p id="descriptionPhotoStatus" role="status" aria-live="polite" style="margin:8px 0 0"></p>
+        </section>
         <details id="sourceDetails" style="width:100%">
           <summary>View or paste book description</summary>
           <textarea id="sourceDescription" aria-label="Source book description" rows="6" placeholder="Paste a publisher description here if needed."></textarea>
@@ -668,8 +675,122 @@
     .join(" ");
 }
 
+let photoEligible = false;
+let photoJob = 0;
+let ocrBusy = false;
+let activeOCRWorker = null;
+let ocrLibraryPromise = null;
+function offerDescriptionPhoto(available) {
+  photoEligible = !!available;
+  document.getElementById('descriptionPhotoFallback').hidden = !photoEligible;
+}
+function resetDescriptionPhoto(hide = true) {
+  ++photoJob;
+  ocrBusy = false;
+  const worker = activeOCRWorker;
+  activeOCRWorker = null;
+  if (worker) Promise.resolve(worker.terminate()).catch(() => {});
+  document.getElementById('descriptionPhotoInput').value = '';
+  document.getElementById('descriptionPhotoStatus').textContent = '';
+  document.getElementById('descriptionPhotoButton').disabled = false;
+  document.getElementById('generateButton').disabled = isLookingUpISBN;
+  document.getElementById('findDescriptionButton').disabled = isLookingUpISBN;
+  if (hide) offerDescriptionPhoto(false);
+}
+function chooseDescriptionPhoto() {
+  if (!photoEligible || isLookingUpISBN || ocrBusy || document.getElementById('sourceDescription').value.trim()) return;
+  const input = document.getElementById('descriptionPhotoInput');
+  input.value = '';
+  input.click();
+}
+function loadOCRLibrary() {
+  if (globalThis.Tesseract) return Promise.resolve(globalThis.Tesseract);
+  if (ocrLibraryPromise) return ocrLibraryPromise;
+  ocrLibraryPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    const timer = setTimeout(() => { script.remove(); reject(new Error('The photo reader could not load. Check your connection and try again.')); }, 60000);
+    script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/tesseract.min.js';
+    script.onload = () => { clearTimeout(timer); globalThis.Tesseract ? resolve(globalThis.Tesseract) : reject(new Error('The photo reader could not start.')); };
+    script.onerror = () => { clearTimeout(timer); script.remove(); reject(new Error('The photo reader could not load. Check your connection and try again.')); };
+    document.head.appendChild(script);
+  }).catch(error => { ocrLibraryPromise = null; throw error; });
+  return ocrLibraryPromise;
+}
+async function prepareDescriptionImage(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = () => reject(new Error('This photo could not be opened. Try a JPEG or PNG photo.')); image.src = url; });
+    if (!image.naturalWidth || !image.naturalHeight) throw new Error('This photo could not be opened.');
+    const scale = Math.min(1, 2200 / Math.max(image.naturalWidth, image.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(image.naturalWidth * scale); canvas.height = Math.round(image.naturalHeight * scale);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('This browser could not prepare the photo.');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    return canvas;
+  } finally { URL.revokeObjectURL(url); }
+}
+async function readDescriptionPhoto(file) {
+  if (!file || !photoEligible || isLookingUpISBN || ocrBusy || document.getElementById('sourceDescription').value.trim()) return;
+  const message = document.getElementById('descriptionPhotoStatus');
+  if (!file.type.startsWith('image/')) { message.textContent = 'Please choose a photo of the book description.'; return; }
+  if (file.size > 20 * 1024 * 1024) { message.textContent = 'This photo is too large. Take a closer photo or choose one under 20 MB.'; return; }
+  const job = ++photoJob, sequence = lookupSequence;
+  const identity = ['isbn', 'title', 'author'].map(id => document.getElementById(id).value).join('\n');
+  const current = () => job === photoJob && sequence === lookupSequence && identity === ['isbn','title','author'].map(id => document.getElementById(id).value).join('\n');
+  let worker, timer, timedOut = false;
+  ocrBusy = true;
+  document.getElementById('descriptionPhotoButton').disabled = true;
+  document.getElementById('generateButton').disabled = true;
+  document.getElementById('findDescriptionButton').disabled = true;
+  message.textContent = 'Loading the photo reader… The first use needs a download.';
+  try {
+    const library = await loadOCRLibrary();
+    if (!current()) return;
+    const image = await prepareDescriptionImage(file);
+    if (!current()) return;
+    const deadline = new Promise((resolve, reject) => { timer = setTimeout(() => { timedOut = true; reject(new Error('Reading took too long. Try a closer, clearer photo of just the description.')); }, 90000); });
+    const operation = (async () => {
+    worker = await library.createWorker('eng', 1, { logger: progress => {
+      if (current() && progress.status === 'recognizing text') message.textContent = 'Reading description… ' + Math.round(progress.progress * 100) + '%';
+    } });
+    if (!current() || timedOut) { await Promise.resolve(worker.terminate()).catch(() => {}); worker = null; return null; }
+    activeOCRWorker = worker;
+    return await worker.recognize(image, { rotateAuto: true });
+    })();
+    const result = await Promise.race([operation, deadline]);
+    if (!current()) return;
+    const extracted = (result.data?.text || '').replace(/-\s*\n\s*/g, '').replace(/\s+/g, ' ').trim();
+    if (extracted.length < 40 || extracted.split(/\s+/).length < 8) throw new Error('Not enough text was readable. Photograph the description closely in good light and try again.');
+    if (extracted.length > 20000) throw new Error('Too much text was found. Photograph only the book description.');
+    currentBookDescription = extracted;
+    document.getElementById('sourceDescription').value = extracted;
+    document.getElementById('summary').value = '';
+    document.getElementById('sourceDetails').open = true;
+    displayBookSource({ description: extracted, source: 'Book description photo' });
+    offerDescriptionPhoto(false);
+    message.textContent = '';
+    statusMessage(result.data.confidence < 60 ? 'Photo text needs a careful review. Correct any mistakes below, then tap Generate Summary.' : 'Photo text ready. Review it below, then tap Generate Summary.');
+    document.getElementById('sourceDescription').scrollIntoView({ block:'center', behavior:'smooth' });
+  } catch (error) {
+    if (current()) message.textContent = error.message || 'The photo could not be read. Try another photo.';
+  } finally {
+    clearTimeout(timer);
+    if (worker) { if (activeOCRWorker === worker) activeOCRWorker = null; await Promise.resolve(worker.terminate()).catch(() => {}); }
+    if (job === photoJob) {
+      ocrBusy = false;
+      document.getElementById('descriptionPhotoButton').disabled = false;
+      document.getElementById('generateButton').disabled = isLookingUpISBN;
+      document.getElementById('findDescriptionButton').disabled = isLookingUpISBN;
+      document.getElementById('descriptionPhotoInput').value = '';
+    }
+  }
+}
+
  async function resolveBook(input, sequence) {
-  // Paid web search is disabled. Only free databases are queried.
+  // Only free book databases are enabled.
   return await lookupBook(input);
 }
 function displayBookSource(book) {
@@ -687,6 +808,7 @@ async function handleTitleAuthor() {
   const title=document.getElementById('title').value.trim(),author=document.getElementById('author').value.trim();
   if(!title||!author){statusMessage('Enter both the title and author, then tap Find Description.');return;}
   const sequence=++lookupSequence;
+  resetDescriptionPhoto();
   isLookingUpISBN=true;pendingLookupISBN='';lastResolvedISBN='';currentBookDescription='';
   document.getElementById('sourceDescription').value='';document.getElementById('summary').value='';
   document.getElementById('bookSource').style.display='none';
@@ -697,6 +819,7 @@ async function handleTitleAuthor() {
     if(sequence!==lookupSequence || title!==document.getElementById('title').value.trim() || author!==document.getElementById('author').value.trim())return;
     currentBookDescription=book.description;document.getElementById('sourceDescription').value=book.description;
     displayBookSource(book);
+    offerDescriptionPhoto(!book.description);
     statusMessage(book.description?'Description found. Tap Generate Summary.':book.warnings?.at(-1)||'No matching description was found. Check the title and author and try again.');
   }catch(error){if(sequence===lookupSequence)statusMessage(error.message);}
   finally{if(sequence===lookupSequence){isLookingUpISBN=false;document.getElementById('generateButton').disabled=false;document.getElementById('findDescriptionButton').disabled=false;}}
@@ -708,6 +831,7 @@ async function handleTitleAuthor() {
   if (isbn === lastResolvedISBN && currentBookDescription) return;
   const previous = isbn === lastResolvedISBN ? { title: document.getElementById('title').value, author: document.getElementById('author').value } : null;
   const sequence = ++lookupSequence;
+  resetDescriptionPhoto();
   currentBookDescription = '';
   lastResolvedISBN = '';
   document.getElementById('sourceDescription').value = '';
@@ -731,6 +855,7 @@ async function handleTitleAuthor() {
     document.getElementById('sourceDescription').value = book.description;
     lastResolvedISBN = isbn;
     displayBookSource(book);
+    offerDescriptionPhoto(!book.description);
     statusMessage(book.description ? 'Description found: ' + book.source :
       book.warnings.length ? 'Automatic lookup could not finish. You can enter the title and author, then tap Find Description.' :
       book.title ? 'No description found yet. Check the title and author, then tap Find Description.' : 'Book not found. Enter the title and author, then tap Find Description.');
@@ -739,7 +864,7 @@ async function handleTitleAuthor() {
 }
 
       async function generateSummary() {
-        if (isLookingUpISBN) return;
+        if (isLookingUpISBN || ocrBusy) return;
         const title = document.getElementById('title').value.trim();
         const author = document.getElementById('author').value.trim();
         const description = document.getElementById('sourceDescription').value.trim();
@@ -891,6 +1016,7 @@ async function handleTitleAuthor() {
           document.getElementById("isbn").value = "";
           currentBookDescription = "";
           ++lookupSequence;
+          resetDescriptionPhoto();
           lastResolvedISBN = "";
           document.getElementById("sourceDescription").value = "";
           updateCardCounter();
@@ -910,6 +1036,7 @@ async function handleTitleAuthor() {
       function editCard(index) {
         const card = cardQueue[index];
         ++lookupSequence;
+        resetDescriptionPhoto();
         currentBookDescription = '';
         lastResolvedISBN = '';
         isLookingUpISBN = false;
@@ -950,6 +1077,7 @@ async function handleTitleAuthor() {
       }
 
       document.getElementById('isbn').addEventListener('input', () => {
+        resetDescriptionPhoto();
         document.getElementById('findDescriptionButton').disabled=false;
         document.getElementById('bookSource').style.display='none';
         ++lookupSequence;
@@ -961,10 +1089,16 @@ async function handleTitleAuthor() {
         document.getElementById('summary').value = '';
       });
       for (const id of ['title','author']) document.getElementById(id).addEventListener('input', () => {
+        resetDescriptionPhoto(false);
         ++lookupSequence; currentBookDescription=''; lastResolvedISBN=''; isLookingUpISBN=false;
         document.getElementById('sourceDescription').value='';document.getElementById('summary').value='';
         document.getElementById('bookSource').style.display='none';
         document.getElementById('generateButton').disabled=false;document.getElementById('findDescriptionButton').disabled=false;
+      });
+      document.getElementById('sourceDescription').addEventListener('input', () => {
+        ++lookupSequence; resetDescriptionPhoto();
+        currentBookDescription = document.getElementById('sourceDescription').value.trim();
+        document.getElementById('summary').value = '';
       });
       // Initialize
       updateCardCounter();

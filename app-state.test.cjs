@@ -30,3 +30,40 @@ test('failed database lookup never invokes paid web search',async()=>{
  a.el('isbn').value='9781665932578';await a.run('handleISBN()');assert.equal(paidCalls,0);
  a.el('title').value='Book';a.el('author').value='Author';await a.run('handleTitleAuthor()');assert.equal(paidCalls,0);
 });
+test('photo fallback is offered only after lookup returns no description',async()=>{
+ let n=0;const a=app(async()=>++n===1?book:{...book,description:''});
+ assert.equal(a.run('photoEligible'),false);
+ a.el('isbn').value='9780316003957';await a.run('handleISBN()');assert.equal(a.run('photoEligible'),false);
+ a.el('isbn').value='9781665932578';await a.run('handleISBN()');assert.equal(a.run('photoEligible'),true);
+ assert.equal(a.el('descriptionPhotoFallback').hidden,false);
+});
+test('photo text populates review box without calling AI, then becomes summary source',async()=>{
+ const a=app(async()=>({...book,description:''}));
+ let terminated=0,aiCalls=0,sent;
+ const text='Three friends discover a hidden letter and follow its clues through their town to solve a long forgotten mystery.';
+ a.context.Tesseract={createWorker:async()=>({recognize:async()=>({data:{text,confidence:94}}),terminate:async()=>{terminated++;}})};
+ a.context.fetch=async(u,o)=>{aiCalls++;sent=JSON.parse(o.body);return {ok:true,json:async()=>({summary:'Three friends follow a mysterious letter.'})};};
+ a.run('prepareDescriptionImage=async()=>({})');
+ a.el('isbn').value='9781665932578';await a.run('handleISBN()');
+ await a.run("readDescriptionPhoto({type:'image/jpeg',size:1000})");
+ assert.equal(aiCalls,0);assert.equal(terminated,1);assert.equal(a.el('sourceDescription').value,text);assert.equal(a.el('sourceDetails').open,true);assert.equal(a.run('photoEligible'),false);
+ await a.run('generateSummary()');assert.equal(sent.description,text);assert.equal(aiCalls,1);
+});
+test('photo reading cannot overwrite a newer scanned book',async()=>{
+ const a=app(async isbn=>isbn==='9781665932578'?{...book,description:''}:book);
+ let resolveText,notifyStart;const started=new Promise(r=>notifyStart=r);
+ a.context.Tesseract={createWorker:async()=>({recognize:()=>{notifyStart();return new Promise(r=>resolveText=r)},terminate:async()=>{}})};
+ a.run('prepareDescriptionImage=async()=>({})');
+ a.el('isbn').value='9781665932578';await a.run('handleISBN()');
+ const pending=a.run("readDescriptionPhoto({type:'image/jpeg',size:1000})");await started;
+ a.el('isbn').value='9780316003957';await a.run('handleISBN()');
+ resolveText({data:{text:'Old book description that must never overwrite the newly scanned book and its source description.',confidence:99}});await pending;
+ assert.equal(a.el('sourceDescription').value,book.description);assert.equal(a.run('ocrBusy'),false);
+});
+test('unreadable photo keeps fallback available and does not create a description',async()=>{
+ const a=app(async()=>({...book,description:''}));
+ a.context.Tesseract={createWorker:async()=>({recognize:async()=>({data:{text:'12345',confidence:20}}),terminate:async()=>{}})};
+ a.run('prepareDescriptionImage=async()=>({})');
+ a.el('isbn').value='9781665932578';await a.run('handleISBN()');await a.run("readDescriptionPhoto({type:'image/jpeg',size:1000})");
+ assert.equal(a.el('sourceDescription').value,'');assert.equal(a.run('photoEligible'),true);assert.match(a.el('descriptionPhotoStatus').textContent,/Not enough text/);assert.equal(a.run('ocrBusy'),false);
+});
