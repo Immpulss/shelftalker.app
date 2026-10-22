@@ -144,3 +144,27 @@ test('changing ISBN still clears previous source and summary',async()=>{
  a.el('isbn').value='9780385548984';a.el('isbn').dispatchEvent({type:'input'});
  assert.equal(a.el('sourceDescription').value,'');assert.equal(a.el('summary').value,'');assert.equal(a.run('currentBookDescription'),'');
 });
+
+test('queued description survives refresh, author correction and another edit without a lookup',async()=>{
+ let lookups=0;const a=app(async()=>{lookups++;return {...book,author:'Author, Illustrator'}});
+ a.el('isbn').value='9780316003957';await a.run('handleISBN()');await a.run('generateSummary()');a.run('addCard({preventDefault(){}})');
+ const b=app(async()=>{throw Error('Editing should not require a lookup')},a.storage);b.run('editCard(0)');
+ assert.equal(b.el('sourceDescription').value,book.description);assert.equal(b.el('summary').value,'A concise summary.');assert.equal(b.el('isbn').value,'9780316003957');
+ b.el('author').value='Author';b.el('author').dispatchEvent({type:'input'});await b.run('handleISBN()');
+ assert.equal(b.el('summary').value,'A concise summary.');assert.equal(b.el('sourceDescription').value,book.description);
+ b.run('addCard({preventDefault(){}})');const c=app(async()=>book,b.storage);c.run('editCard(0)');
+ assert.equal(c.run('cardQueue.length'),1);assert.equal(c.el('author').value,'Author');assert.equal(c.el('sourceDescription').value,book.description);assert.equal(lookups,1);
+});
+test('legacy saved cards remain editable and keep summary after correcting author',()=>{
+ const storage=memoryStorage();storage.setItem('ShelfTalker.printQueue.v1',JSON.stringify({version:1,cards:[{title:'Book',author:'Auther',summary:'Saved summary.'}]}));
+ const a=app(async()=>book,storage);a.el('sourceDescription').value='Another book description';a.run('editCard(0)');
+ assert.equal(a.el('sourceDescription').value,'');assert.equal(a.el('summary').value,'Saved summary.');
+ a.el('author').value='Author';a.el('author').dispatchEvent({type:'input'});a.run('addCard({preventDefault(){}})');
+ const b=app(async()=>book,storage);assert.equal(b.run('cardQueue[0].author'),'Author');assert.equal(b.run('cardQueue[0].summary'),'Saved summary.');
+});
+test('OCR description is stored with its card and can be reused for regeneration',async()=>{
+ const a=app(async()=>book);a.el('title').value='Photo Book';a.el('author').value='Author';a.el('sourceDescription').value='A description transcribed from the book photo.';a.el('sourceDescription').dispatchEvent({type:'input'});
+ a.el('summary').value='Photo summary.';a.run('addCard({preventDefault(){}})');const b=app(async()=>book,a.storage);b.run('editCard(0)');
+ let sent;b.context.fetch=async(u,o)=>{sent=JSON.parse(o.body);return {ok:true,json:async()=>({summary:'Regenerated summary.'})}};
+ await b.run('generateSummary()');assert.equal(sent.description,'A description transcribed from the book photo.');assert.equal(b.el('summary').value,'Regenerated summary.');
+});

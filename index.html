@@ -590,7 +590,13 @@
             card && ['title','author','summary'].every(key => typeof card[key] === 'string' && card[key].trim()) && card.summary.length <= 260)) {
             throw new Error('Invalid saved queue');
           }
-          for (const {title, author, summary} of saved.cards) cardQueue.push({title, author, summary});
+          for (const card of saved.cards) {
+            const {title, author, summary} = card;
+            cardQueue.push({title, author, summary,
+              description: typeof card.description === 'string' ? card.description : '',
+              isbn: typeof card.isbn === 'string' ? card.isbn : '',
+              sourceLabel: typeof card.sourceLabel === 'string' ? card.sourceLabel : ''});
+          }
           queueStorageMessage(cardQueue.length ? `Restored ${cardQueue.length} saved card${cardQueue.length === 1 ? '' : 's'} on this device.` : 'Queue saved on this device.');
         } catch (error) {
           queueStorageMessage('Saved queue could not be loaded. Browser storage may be unavailable or damaged.', true);
@@ -861,10 +867,10 @@ async function handleTitleAuthor() {
 }
 
  async function handleISBN() {
-  resetCardEditing();
   const isbn = document.getElementById('isbn').value.replace(/[^0-9Xx]/g, '').toUpperCase();
   if (isLookingUpISBN && isbn === pendingLookupISBN) return;
   if (isbn === lastResolvedISBN && currentBookDescription) return;
+  resetCardEditing();
   const previous = isbn === lastResolvedISBN ? { title: document.getElementById('title').value, author: document.getElementById('author').value } : null;
   const sequence = ++lookupSequence;
   resetDescriptionPhoto();
@@ -1048,8 +1054,12 @@ async function handleTitleAuthor() {
           title = toTitleCase(title);
           author = toTitleCase(author);
           const wasEditing = editingCardIndex !== null;
-          if (wasEditing) cardQueue[editingCardIndex] = { title, author, summary };
-          else cardQueue.push({ title, author, summary });
+          const card = { title, author, summary,
+            description: document.getElementById('sourceDescription').value.trim(),
+            isbn: document.getElementById('isbn').value.trim(),
+            sourceLabel: document.getElementById('bookSource').style.display === 'none' ? '' : document.getElementById('bookSource').textContent };
+          if (wasEditing) cardQueue[editingCardIndex] = card;
+          else cardQueue.push(card);
           resetCardEditing();
           saveQueue();
           document.getElementById("title").value = "";
@@ -1081,12 +1091,15 @@ async function handleTitleAuthor() {
         document.querySelector('.add-btn').textContent = '💾 Save Changes';
         ++lookupSequence;
         resetDescriptionPhoto();
-        currentBookDescription = '';
-        lastResolvedISBN = '';
+        currentBookDescription = card.description || '';
+        lastResolvedISBN = card.isbn ? card.isbn.replace(/[^0-9Xx]/g, '').toUpperCase() : '';
         isLookingUpISBN = false;
         document.getElementById('generateButton').disabled = false;
-        document.getElementById('isbn').value = '';
-        document.getElementById('sourceDescription').value = '';
+        document.getElementById('isbn').value = card.isbn || '';
+        document.getElementById('sourceDescription').value = currentBookDescription;
+        const source = document.getElementById('bookSource');
+        source.textContent = card.sourceLabel || '';
+        source.style.display = card.sourceLabel ? 'block' : 'none';
         statusMessage('Editing a queued card. The original stays saved until you press Save Changes.');
         
         // Keep the saved original until the edited card is submitted.
