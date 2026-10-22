@@ -1135,10 +1135,12 @@ async function handleTitleAuthor() {
       });
       for (const id of ['title','author']) document.getElementById(id).addEventListener('input', () => {
         resetDescriptionPhoto(false);
-        ++lookupSequence; currentBookDescription=''; lastResolvedISBN=''; isLookingUpISBN=false;
-        document.getElementById('sourceDescription').value='';document.getElementById('summary').value='';
-        document.getElementById('bookSource').style.display='none';
-        document.getElementById('generateButton').disabled=false;
+        // Metadata corrections keep the retrieved source and any reviewed summary.
+        // Invalidate pending requests so their responses cannot overwrite this edit.
+        ++lookupSequence;
+        isLookingUpISBN = false;
+        currentBookDescription = document.getElementById('sourceDescription').value.trim();
+        document.getElementById('generateButton').disabled = false;
       });
       document.getElementById('sourceDescription').addEventListener('input', () => {
         ++lookupSequence; resetDescriptionPhoto();

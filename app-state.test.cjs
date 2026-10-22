@@ -4,7 +4,7 @@ function memoryStorage(){const data=new Map();return {getItem:key=>data.has(key)
 function app(lookup, storage=memoryStorage()) {
  const els=new Map();
  const node=()=>({value:'',style:{},textContent:'',disabled:false,innerHTML:'',scrollHeight:0,offsetHeight:100,
-  addEventListener(){},scrollIntoView(){},appendChild(){},querySelector(){return node()},closest(){return node()}});
+  listeners:{},addEventListener(type,fn){(this.listeners[type] ||= []).push(fn)},dispatchEvent(event){for(const fn of this.listeners[event.type] || [])fn(event)},scrollIntoView(){},appendChild(){},querySelector(){return node()},closest(){return node()}});
  const el=id=>{if(!els.has(id))els.set(id,node());return els.get(id);};
  const context=vm.createContext({localStorage:storage,confirm:()=>true,
   document:{getElementById:el,querySelector:()=>el('button'),createElement:()=>node()},
@@ -114,4 +114,33 @@ test('damaged or invalid saved cards do not crash startup or overwrite saved raw
   assert.equal(a.run('cardQueue.length'),0);assert.match(a.el('queueStorageStatus').textContent,/could not be loaded/);
   assert.equal(storage.getItem('ShelfTalker.printQueue.v1'),raw);
  }
+});
+
+test('editing title or removing illustrator preserves description, summary and source',async()=>{
+ let n=0;const a=app(async()=>{n++;return {...book,author:'Author, Illustrator'}});
+ a.el('isbn').value='9780316003957';await a.run('handleISBN()');await a.run('generateSummary()');
+ const summary=a.el('summary').value,source=a.el('bookSource').textContent;
+ a.el('author').value='Author';a.el('author').dispatchEvent({type:'input'});
+ a.el('title').value='Corrected title';a.el('title').dispatchEvent({type:'input'});
+ assert.equal(a.el('sourceDescription').value,book.description);assert.equal(a.run('currentBookDescription'),book.description);
+ assert.equal(a.el('summary').value,summary);assert.equal(a.el('bookSource').textContent,source);
+ await a.run('handleISBN()');assert.equal(n,1);assert.equal(a.el('title').value,'Corrected title');
+ a.run('addCard({preventDefault(){}})');const b=app(async()=>book,a.storage);
+ assert.equal(b.run('cardQueue[0].author'),'Author');assert.equal(b.run('cardQueue[0].title'),'Corrected Title');assert.equal(b.run('cardQueue[0].summary'),summary);
+});
+test('metadata edit preserves OCR description and generated summary',async()=>{
+ const a=app(async()=>({...book,description:''}));a.el('title').value='Book';a.el('author').value='Author, Illustrator';
+ a.el('sourceDescription').value='A description read from the book photo.';a.el('sourceDescription').dispatchEvent({type:'input'});
+ a.el('summary').value='A reviewed summary.';a.el('author').value='Author';a.el('author').dispatchEvent({type:'input'});
+ assert.equal(a.el('sourceDescription').value,'A description read from the book photo.');assert.equal(a.el('summary').value,'A reviewed summary.');
+});
+test('metadata correction blocks pending lookup from overwriting edited fields',async()=>{
+ let resolve;const a=app(()=>new Promise(r=>resolve=r));a.el('isbn').value='9780316003957';const pending=a.run('handleISBN()');
+ a.el('title').value='My corrected title';a.el('title').dispatchEvent({type:'input'});resolve(book);await pending;
+ assert.equal(a.el('title').value,'My corrected title');assert.equal(a.el('generateButton').disabled,false);
+});
+test('changing ISBN still clears previous source and summary',async()=>{
+ const a=app(async()=>book);a.el('isbn').value='9780316003957';await a.run('handleISBN()');a.el('summary').value='Previous summary';
+ a.el('isbn').value='9780385548984';a.el('isbn').dispatchEvent({type:'input'});
+ assert.equal(a.el('sourceDescription').value,'');assert.equal(a.el('summary').value,'');assert.equal(a.run('currentBookDescription'),'');
 });
